@@ -1,17 +1,31 @@
 import { createEmptyCard, fsrs, Rating, type Card, type Grade, type State } from 'ts-fsrs'
 import type { CardRow } from '../db/schema'
 
-const scheduler = fsrs()
 export { Rating }
 export type { Grade }
+export const GRADES: Grade[] = [Rating.Again, Rating.Hard, Rating.Good, Rating.Easy]
+
+const cache = new Map<number, ReturnType<typeof fsrs>>()
+function scheduler(retention: number) {
+  let s = cache.get(retention)
+  if (!s) { s = fsrs({ request_retention: retention }); cache.set(retention, s) }
+  return s
+}
 
 export function newCard(lemmaId: number, now = new Date()): CardRow {
   return toRow(lemmaId, createEmptyCard(now))
 }
 
-export function schedule(row: CardRow, rating: Grade, now = new Date()): CardRow {
-  const { card } = scheduler.next(fromRow(row), now, rating)
-  return toRow(row.lemmaId, card)
+/** Outcome of each of the four ratings, computed once so the preview shown equals what gets stored. */
+export function preview(row: CardRow, now = new Date(), retention = 0.9): Record<Grade, CardRow> {
+  const rec = scheduler(retention).repeat(fromRow(row), now)
+  const out = {} as Record<Grade, CardRow>
+  for (const g of GRADES) out[g] = { ...toRow(row.lemmaId, rec[g].card), lastExampleId: row.lastExampleId, seenExamples: row.seenExamples }
+  return out
+}
+
+export function schedule(row: CardRow, rating: Grade, now = new Date(), retention = 0.9): CardRow {
+  return preview(row, now, retention)[rating]
 }
 
 function toRow(lemmaId: number, c: Card): CardRow {

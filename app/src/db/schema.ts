@@ -15,6 +15,8 @@ export interface CardRow {
   lapses: number
   state: number
   last_review?: number
+  lastExampleId?: number // example shown on the last review
+  seenExamples?: number[] // recent example ids, oldest first
 }
 export interface ReviewLog {
   id: string
@@ -23,6 +25,8 @@ export interface ReviewLog {
   reviewedAt: number
   deviceId: string
   synced: 0 | 1
+  due?: number // the card's new due (epoch ms) after this review
+  state?: number // the card's state BEFORE this review (0 new, 1 learning, 2 review, 3 relearning)
 }
 export interface Setting { key: string; value: unknown }
 

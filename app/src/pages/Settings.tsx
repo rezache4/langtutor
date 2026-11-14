@@ -1,11 +1,12 @@
 import { useRef, useState } from 'react'
-import { useLiveQuery } from 'dexie-react-hooks'
 import { db, setSetting } from '../db/schema'
+import { DEFAULTS, useSettings } from '../lib/settings'
 import { syncEnabled } from '../lib/supabase'
-import type { AudioMode } from '../lib/tts'
+
+const opts = (list: number[], cur: number) => (list.includes(cur) ? list : [...list, cur].sort((a, b) => a - b))
 
 export default function Settings() {
-  const mode = useLiveQuery(async () => ((await db.settings.get('audioMode'))?.value as AudioMode) ?? 'tap', [])
+  const st = useSettings() ?? DEFAULTS
   const file = useRef<HTMLInputElement>(null)
   const [msg, setMsg] = useState('')
 
@@ -43,13 +44,38 @@ export default function Settings() {
   return (
     <>
       <h1>Settings</h1>
-      <div className="card">
+      <div className="card settings">
+        <label>
+          New cards per day
+          <select value={st.newPerDay} onChange={e => setSetting('newPerDay', Number(e.target.value))}>
+            {opts([0, 5, 10, 15, 20, 30, 50], st.newPerDay).map(n => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </label>
+        <label>
+          Session size (cards)
+          <select value={st.sessionSize} onChange={e => setSetting('sessionSize', Number(e.target.value))}>
+            {opts([10, 20, 30, 50, 100], st.sessionSize).map(n => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </label>
+        <label>
+          Card front
+          <select value={st.frontMode} onChange={e => setSetting('frontMode', e.target.value)}>
+            <option value="sentence">Example sentence</option>
+            <option value="lemma">Bare lemma</option>
+          </select>
+        </label>
         <label>
           Audio
-          <select value={mode ?? 'tap'} onChange={e => setSetting('audioMode', e.target.value)}>
+          <select value={st.audioMode} onChange={e => setSetting('audioMode', e.target.value)}>
             <option value="off">Off</option>
             <option value="tap">Tap to play</option>
             <option value="auto">Auto-play</option>
+          </select>
+        </label>
+        <label>
+          Desired retention
+          <select value={st.desiredRetention} onChange={e => setSetting('desiredRetention', Number(e.target.value))}>
+            {opts([0.8, 0.85, 0.9, 0.95, 0.97], st.desiredRetention).map(n => <option key={n} value={n}>{Math.round(n * 100)}%</option>)}
           </select>
         </label>
       </div>

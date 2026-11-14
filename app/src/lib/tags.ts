@@ -50,3 +50,15 @@ export const codesOf = (tags: string | string[] | undefined): string[] =>
 /** Plain labels for a stored tag string; unknown codes are dropped. */
 export const labelsOf = (tags: string | string[] | undefined): string[] =>
   codesOf(tags).map(labelTag).filter((x): x is string => !!x)
+
+/** Forms of a lemma grouped by tense/mood, for compact display. */
+export function groupForms(forms: { form: string; tags: string }[]): [TagGroup, string[]][] {
+  const g = new Map<TagGroup, Set<string>>()
+  for (const f of forms) {
+    const code = codesOf(f.tags).find(x => labelsOf(x).length)
+    const grp = code ? groupOf(code) : 'Other'
+    if (!g.has(grp)) g.set(grp, new Set())
+    g.get(grp)!.add(f.form)
+  }
+  return GROUPS.filter(x => g.has(x)).map(x => [x, [...g.get(x)!]] as [TagGroup, string[]])
+}

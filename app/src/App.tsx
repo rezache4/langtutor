@@ -6,6 +6,9 @@ import Stats from './pages/Stats'
 import Settings from './pages/Settings'
 import { useEffect, useState } from 'react'
 import { loadBundle, type Progress } from './data/loader'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { useSettings } from './lib/settings'
+import { availableCount } from './lib/queue'
 
 const tabs = [
   { to: '/', label: 'Search', icon: '\u{1F50D}' },
@@ -22,6 +25,10 @@ export default function App() {
     loadBundle(p => { if (on) setProg(p) }).catch(() => { /* offline or no bundle */ }).finally(() => { if (on) setReady(true) })
     return () => { on = false }
   }, [])
+  const settings = useSettings()
+  const [tick, setTick] = useState(0)
+  useEffect(() => { const t = setInterval(() => setTick(x => x + 1), 30_000); return () => clearInterval(t) }, [])
+  const due = useLiveQuery(async () => (ready && settings ? availableCount(settings) : 0), [ready, settings?.newPerDay, settings?.sessionSize, tick]) ?? 0
   if (!ready) return (
     <div className="splash">
       <h1>LangTutor</h1>
@@ -45,7 +52,7 @@ export default function App() {
       <nav className="tabbar">
         {tabs.map(t => (
           <NavLink key={t.to} to={t.to} end={t.to === '/'} className={({ isActive }) => (isActive ? 'active' : '')}>
-            <span aria-hidden>{t.icon}</span>
+            <span aria-hidden className="ico">{t.icon}{t.to === '/review' && due > 0 && <i className="badge" data-testid="badge">{due > 99 ? '99+' : due}</i>}</span>
             <small>{t.label}</small>
           </NavLink>
         ))}
