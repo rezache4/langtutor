@@ -1,0 +1,31 @@
+{
+  "version": "sample-1",
+  "lemmas": [
+    { "id": 1, "lemma": "cercare", "pos": "verb", "glosses": ["to look for", "to try"] },
+    { "id": 2, "lemma": "andare", "pos": "verb", "glosses": ["to go"] }
+  ],
+  "forms": [
+    { "form": "cercare", "lemmaId": 1, "tags": ["inf"] },
+    { "form": "cerco", "lemmaId": 1, "tags": ["pres", "1s"] },
+    { "form": "cerchi", "lemmaId": 1, "tags": ["pres", "2s"] },
+    { "form": "cercherai", "lemmaId": 1, "tags": ["fut", "2s"] },
+    { "form": "cercherebbe", "lemmaId": 1, "tags": ["cond", "3s"] },
+    { "form": "cercato", "lemmaId": 1, "tags": ["ppart"] },
+    { "form": "cercando", "lemmaId": 1, "tags": ["gerund"] },
+    { "form": "andare", "lemmaId": 2, "tags": ["inf"] },
+    { "form": "vado", "lemmaId": 2, "tags": ["pres", "1s"] },
+    { "form": "vai", "lemmaId": 2, "tags": ["pres", "2s"] },
+    { "form": "andrò", "lemmaId": 2, "tags": ["fut", "1s"] },
+    { "form": "andato", "lemmaId": 2, "tags": ["ppart"] }
+  ],
+  "examples": [
+    { "id": 1, "lemmaId": 1, "form": "cerco", "it": "Cerco le chiavi da un'ora.", "en": "I have been looking for my keys for an hour." },
+    { "id": 2, "lemmaId": 1, "form": "cerchi", "it": "Che cosa cerchi?", "en": "What are you looking for?" },
+    { "id": 3, "lemmaId": 1, "form": "cercherai", "it": "Domani cercherai un nuovo lavoro.", "en": "Tomorrow you will look for a new job." },
+    { "id": 4, "lemmaId": 1, "form": "cercherebbe", "it": "Cercherebbe di aiutarti, se potesse.", "en": "He would try to help you if he could." },
+    { "id": 5, "lemmaId": 1, "form": "cercato", "it": "Ho cercato dappertutto.", "en": "I have looked everywhere." },
+    { "id": 6, "lemmaId": 1, "form": "cercando", "it": "Sto cercando un ristorante.", "en": "I am looking for a restaurant." },
+    { "id": 7, "lemmaId": 2, "form": "vado", "it": "Vado a casa.", "en": "I am going home." },
+    { "id": 8, "lemmaId": 2, "form": "andato", "it": "Sono andato al mercato.", "en": "I went to the market." }
+  ]
+}
