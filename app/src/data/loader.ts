@@ -72,7 +72,10 @@ export async function loadBundle(onProgress: (p: Progress) => void = () => {}): 
   const total = b.lemmas.length + b.forms.length + b.examples.length
   const done = { n: 0 }
   onProgress({ phase: 'import', pct: 0 })
-  await db.formIndex.clear() // surrogate keys: avoid duplicates on re-import
+  // Dictionary tables are replaced wholesale (ids change between builds); user tables are untouched.
+  await db.formIndex.clear()
+  await db.lemmas.clear()
+  await db.examples.clear()
   await putChunks(db.lemmas, b.lemmas, done, total, onProgress)
   await putChunks(db.formIndex, b.forms, done, total, onProgress)
   await putChunks(db.examples, b.examples, done, total, onProgress)

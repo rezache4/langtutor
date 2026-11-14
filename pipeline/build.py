@@ -40,6 +40,7 @@ HARD_MAX_W = 25
 # Size control: lemmas that never occur in the Tatoeba corpus (obscure words, ~80% of the
 # dictionary) are dropped together with their forms unless PRUNE_NO_EXAMPLES=0.
 PRUNE_NO_EXAMPLES = os.environ.get("PRUNE_NO_EXAMPLES", "1") != "0"
+KEEP_FILE = os.path.join(ROOT, "keep_lemmas.txt")   # optional: lemmas kept even with zero examples
 POOL_PER_FORM = 80                            # candidate sentences kept per surface form
 MAX_TAGSETS = 3
 
@@ -55,12 +56,21 @@ REAL_ACCENT_MONO = {"è", "dà", "dì", "là", "lì", "né", "sì", "tè", "già
                     "ciò", "giù", "ché", "scià", "diè", "piè", "ciò", "fé", "ahimè"}
 
 
+def load_keep():
+    """Optional keep_lemmas.txt: one lemma per line ('#' comments). Missing file -> empty set."""
+    if not os.path.exists(KEEP_FILE):
+        return set()
+    with open(KEEP_FILE, encoding="utf-8") as f:
+        return {norm_form(l.split("#")[0]) for l in f if l.split("#")[0].strip()}
+
+
 def log(*a):
     print(f"[{time.strftime('%H:%M:%S')}]", *a, flush=True)
 
 
 RARE_TAGS = {"archaic", "obsolete", "poetic", "dialectal", "regional", "Tuscany", "dated",
              "misspelling", "proscribed", "nonstandard", "error-unknown-tag", "error-lua-exec"}
+LEMMA_RARE = {"archaic", "obsolete", "dated", "poetic", "dialectal"}   # lemma-level: every sense has one
 MOODS = {"indicative": "ind", "subjunctive": "sub", "imperative": "imp", "conditional": "cond"}
 TENSES = {"present": "pres", "imperfect": "impf", "historic": "hist", "future": "fut"}
 PERSONS = {"first-person": "1", "second-person": "2", "third-person": "3"}
@@ -212,6 +222,7 @@ def parse_kaikki(path):
                 continue          # multiword, hyphenated, or capitalised (proper noun)
             lw = norm_form(word)
             glosses = []
+            rare_flags = []
             for s in e.get("senses") or []:
                 tags = set(s.get("tags") or [])
                 targets = s.get("form_of") or s.get("alt_of")
@@ -236,9 +247,11 @@ def parse_kaikki(path):
                     g = short_gloss(gl[0])
                     if g and not GLOSS_NOTE_RE.match(g) and g not in glosses:
                         glosses.append(g)
+                        rare_flags.append(bool(tags & LEMMA_RARE))
             if not glosses:
                 continue
-            ent = entries.setdefault((lw, pos), {"glosses": [], "forms": defaultdict(set)})
+            ent = entries.setdefault((lw, pos), {"glosses": [], "forms": defaultdict(set), "rare": True})
+            ent["rare"] = ent["rare"] and all(rare_flags)
             for g in glosses:
                 if g not in ent["glosses"] and len(ent["glosses"]) < MAX_GLOSSES:
                     ent["glosses"].append(g)
@@ -312,10 +325,14 @@ def build():
     pairs = load_pairs()
     tok_sents = defaultdict(list)       # token -> [sentence idx]
     freq = defaultdict(int)             # surface form -> number of Tatoeba sentences containing it
+    tokcount = defaultdict(int)         # surface form -> total token occurrences in Tatoeba
     sent_rank = []                       # idx -> (lens, nwords)
     for si, (it, _en) in enumerate(pairs):
         words = [t for t in tokenize(it) if not t.endswith("'")]
         nw = len(words)
+        for t in words:
+            if t in form_map:
+                tokcount[t] += 1
         for t in set(words):
             if t in form_map:
                 freq[t] += 1
@@ -340,6 +357,48 @@ def build():
         if form in pool:
             for lid in lm:
                 lemma_forms[lid].append(form)
+    # lemma freq = total Tatoeba token count of all its forms. Tokens of a form shared by several
+    # lemmas (va = andare/gire, gente = noun/gire...) are split between them in proportion to
+    # their own freq (a few EM rounds; lemmas whose senses are all archaic/obsolete/poetic count 50x less), so a lemma cannot win just because it borrows another's forms.
+    lemma_word = {lid: k[0] for k, lid in lemma_id.items()}
+    weight = {lid: (0.02 if entries[k]["rare"] else 1.0) for k, lid in lemma_id.items()}
+    counted = [(tokcount[f], list(form_map[f])) for f in tokcount if f in form_map]
+    eff = defaultdict(float)
+    for c, lm in counted:
+        for lid in lm:
+            eff[lid] += c
+    for _ in range(5):
+        nxt = defaultdict(float)
+        for c, lm in counted:
+            if len(lm) == 1:
+                nxt[lm[0]] += c
+                continue
+            tot = sum(eff[l] * weight[l] for l in lm) or 1.0
+            for l in lm:
+                nxt[l] += c * eff[l] * weight[l] / tot
+        eff = nxt
+    lemma_freq = {lid: int(round(v)) for lid, v in eff.items()}
+    top_word = {}                        # ambiguous form -> headword of the most frequent lemma
+    for form, lm in form_map.items():
+        words = {lemma_word[l] for l in lm}
+        if len(words) > 1:
+            best = max(lm, key=lambda l: (eff.get(l, 0.0) * weight[l], lemma_word[l] == form, -l))
+            top_word[form] = lemma_word[best]
+    unamb = defaultdict(set)             # lemma id -> its forms that no lemma with another headword has
+    for lid, fl in lemma_forms.items():
+        unamb[lid] = {f for f in fl if f not in top_word}
+    tok_cache = {}
+
+    def allowed(lid, form, si):
+        """A sentence matched through an ambiguous form only goes to the most frequent lemma,
+        unless the sentence also contains an unambiguous form of this lemma."""
+        if top_word.get(form, lemma_word[lid]) == lemma_word[lid]:
+            return True
+        toks = tok_cache.get(si)
+        if toks is None:
+            toks = tok_cache[si] = set(tokenize(pairs[si][0]))
+        return bool(toks & unamb[lid])
+
     MIN_TOP, MAX_SHARE = 6, 0.4
     cap = max(1, int(MAX_EX * MAX_SHARE))
     chosen = {}
@@ -351,7 +410,7 @@ def build():
 
         def take(f):
             p, i = pool[f], ptr[f]
-            while i < len(p) and p[i] in used:
+            while i < len(p) and (p[i] in used or not allowed(lid, f, p[i])):
                 i += 1
             ptr[f] = i
             if i >= len(p):
@@ -371,12 +430,16 @@ def build():
     log(f"selected examples for {len(chosen)} lemmas")
 
     # ---- assemble (every lemma in entries has glosses; keep only those)
+    keep_words = load_keep()
+    if keep_words:
+        log(f"keep_lemmas.txt: {len(keep_words)} lemmas kept even without examples")
     lemmas, kept = [], set()
     for k in keys:
         ent = entries[k]
-        if ent["glosses"] and (lemma_id[k] in chosen or not PRUNE_NO_EXAMPLES):
+        if ent["glosses"] and (lemma_id[k] in chosen or not PRUNE_NO_EXAMPLES or k[0] in keep_words):
             lid = lemma_id[k]
-            lemmas.append({"id": lid, "lemma": k[0], "pos": k[1], "glosses": ent["glosses"]})
+            lemmas.append({"id": lid, "lemma": k[0], "pos": k[1], "glosses": ent["glosses"],
+                           "freq": lemma_freq.get(lid, 0)})
             kept.add(lid)
     forms = []
     dropped_rare = 0

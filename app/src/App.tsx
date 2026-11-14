@@ -1,6 +1,7 @@
 import { NavLink, Route, Routes } from 'react-router-dom'
 import Search from './pages/Search'
 import Word from './pages/Word'
+import Entry from './pages/Entry'
 import Review from './pages/Review'
 import Stats from './pages/Stats'
 import Settings from './pages/Settings'
@@ -44,6 +45,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Search />} />
           <Route path="/word/:lemma" element={<Word />} />
+          <Route path="/entry/:id" element={<Entry />} />
           <Route path="/review" element={<Review />} />
           <Route path="/stats" element={<Stats />} />
           <Route path="/settings" element={<Settings />} />

@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useLocation, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, type Example, type Lemma } from '../db/schema'
-import { newCard } from '../lib/fsrs'
+import { db, type Ex } from '../db/schema'
 import { Highlighted, Speak } from '../lib/ui'
-import { nextReviewText } from '../lib/time'
+import { isLive } from '../lib/cards'
+import { CardControls } from '../lib/CardControls'
+import { formLabel, rankForm, wordUrl } from '../lib/lookup'
+import { lemmaExamples, mergeGlosses, userGlossTexts } from '../lib/userdata'
 import { GROUPS, codesOf, groupOf, labelsOf, type TagGroup } from '../lib/tags'
 
 function shuffle<T>(a: T[]): T[] {
@@ -20,8 +22,6 @@ export default function Word() {
   const nav = useNavigate()
   const locState = useLocation().state as { form?: string; fromReview?: boolean } | null
   const stateForm = locState?.form
-  const alsoIds = (sp.get('also') ?? '').split(',').map(Number).filter(Boolean)
-  const alsoKey = alsoIds.join(',')
   const hl = (sp.get('form') ?? stateForm ?? '').toLowerCase()
   const [chip, setChip] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
@@ -30,16 +30,19 @@ export default function Word() {
     let l = id ? await db.lemmas.get(id) : undefined
     if (!l || l.lemma !== lemma) l = await db.lemmas.where('lemma').equals(lemma).first()
     if (!l) return null
-    const examples = await db.examples.where('lemmaId').equals(l.id).toArray()
+    const examples = await lemmaExamples(l.id)
     const forms = await db.formIndex.where('lemmaId').equals(l.id).toArray()
-    const card = (await db.cards.get(l.id)) ?? null
-    const also = (await db.lemmas.bulkGet(alsoKey ? alsoKey.split(',').map(Number) : [])).filter((x): x is Lemma => !!x && x.id !== l.id)
-    return { l, examples, forms, card, also }
-  }, [lemma, id, alsoKey])
+    const c = await db.cards.get(`l${l.id}`)
+    const card = isLive(c) ? c : null
+    const gl = mergeGlosses(l.glosses, await userGlossTexts(l.id))
+    // Did you mean: other lemmas the SEARCHED form itself maps to (never the lemma's other forms).
+    const others = hl && !locState?.fromReview ? (await rankForm(hl)).filter(r => r.l.id !== l.id) : []
+    return { l, examples, forms, card, gl, others }
+  }, [lemma, id, hl, !!locState?.fromReview])
 
   const lemmaId = data?.l.id
   const nEx = data?.examples.length
-  const shuffled = useMemo<Example[]>(() => {
+  const shuffled = useMemo<Ex[]>(() => {
     const s = shuffle(data?.examples ?? [])
     if (!hl) return s
     return [...s.filter(e => e.form === hl), ...s.filter(e => e.form !== hl)] // searched form first
@@ -63,30 +66,27 @@ export default function Word() {
 
   if (data === undefined) return null
   if (data === null) return <><h1>{lemma}</h1><p className="muted">Not found.</p></>
-  const { l, card, also } = data
+  const { l, card, gl: merged, others } = data
   const active = chip && data.examples.some(e => e.form === chip) ? chip : null
   const shown = active ? shuffled.filter(e => e.form === active) : shuffled
-  const gl = moreGl ? l.glosses : l.glosses.slice(0, 3)
+  const all = [...merged.dict, ...merged.user]
+  const gl = moreGl ? all : [...merged.dict.slice(0, 3), ...merged.user.slice(0, 3)]
   return (
     <>
       {locState?.fromReview && <button className="link" onClick={() => nav(-1)}>← Back to review</button>}
       <h1>{l.lemma} <Speak text={l.lemma} /></h1>
       <p className="muted"><span className="tag">{l.pos}</span> {gl.join('; ')}
-        {l.glosses.length > 3 && <> <button className="link" onClick={() => setMoreGl(!moreGl)}>{moreGl ? 'less' : `more (${l.glosses.length - 3})`}</button></>}
+        {all.length > gl.length || moreGl ? <> <button className="link" onClick={() => setMoreGl(!moreGl)}>{moreGl ? 'less' : `more (${all.length - gl.length})`}</button></> : null}
       </p>
-      {also.length > 0 && (
-        <p className="muted also">Also: {also.map((x, i) => (
-          <span key={x.id}>{i > 0 && ', '}<Link to={`/word/${encodeURIComponent(x.lemma)}?id=${x.id}&form=${encodeURIComponent(hl)}`}>{x.lemma}</Link></span>
-        ))}</p>
+      {others.length > 0 && (
+        <p className="muted also" data-testid="didyoumean">Did you mean: {others.map((r, i) => {
+          const lab = formLabel(r, hl)
+          return (
+            <span key={r.l.id}>{i > 0 && ', '}<Link to={wordUrl(r.l, hl)} state={{ form: hl }}>{r.l.lemma}</Link> ({r.l.pos}{lab ? `, ${lab}` : ''})</span>
+          )
+        })}?</p>
       )}
-      {card ? (
-        <div className="card inreview">
-          <div><strong>In review</strong> · {card.state === 0 ? 'new card' : `next: ${nextReviewText(card).replace('Next review: ', '')}`}</div>
-          <button className="link" onClick={() => db.cards.delete(l.id)}>Remove</button>
-        </div>
-      ) : (
-        <button className="primary big" onClick={() => db.cards.put(newCard(l.id))}>Add to review</button>
-      )}
+      <CardControls cardRef={{ lemmaId: l.id }} card={card} />
       <h2>Examples ({shown.length})</h2>
       {grouped.length > 0 && (
         <div className="filter">

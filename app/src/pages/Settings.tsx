@@ -2,13 +2,16 @@ import { useRef, useState } from 'react'
 import { db, setSetting } from '../db/schema'
 import { DEFAULTS, useSettings } from '../lib/settings'
 import { syncEnabled } from '../lib/supabase'
+import { importReverso, type ImportSummary } from '../lib/reverso'
 
 const opts = (list: number[], cur: number) => (list.includes(cur) ? list : [...list, cur].sort((a, b) => a - b))
 
 export default function Settings() {
   const st = useSettings() ?? DEFAULTS
   const file = useRef<HTMLInputElement>(null)
+  const csv = useRef<HTMLInputElement>(null)
   const [msg, setMsg] = useState('')
+  const [rv, setRv] = useState<{ busy?: string; err?: string; sum?: ImportSummary } | null>(null)
 
   async function doExport() {
     const data = {
@@ -16,6 +19,9 @@ export default function Settings() {
       cards: await db.cards.toArray(),
       reviewLog: await db.reviewLog.toArray(),
       settings: await db.settings.toArray(),
+      userEntries: await db.userEntries.toArray(),
+      userExamples: await db.userExamples.toArray(),
+      userGlosses: await db.userGlosses.toArray(),
     }
     const url = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: 'application/json' }))
     const a = document.createElement('a')
@@ -30,14 +36,33 @@ export default function Settings() {
       const d = JSON.parse(await f.text())
       if (d.app !== 'langtutor' || !Array.isArray(d.cards) || !Array.isArray(d.reviewLog) || !Array.isArray(d.settings))
         throw new Error('Not a LangTutor export')
-      await db.transaction('rw', db.cards, db.reviewLog, db.settings, async () => {
-        await db.cards.bulkPut(d.cards)
-        await db.reviewLog.bulkPut(d.reviewLog)
-        await db.settings.bulkPut(d.settings)
+      const now = Date.now()
+      // Older exports: numeric card ids and no updatedAt.
+      const cardId = (x: unknown) => (typeof x === 'number' ? `l${x}` : x)
+      const cards = d.cards.map((c: Record<string, unknown>) => ({ ...c, id: cardId(c.id), lemmaId: c.lemmaId ?? (typeof c.id === 'number' ? c.id : undefined), updatedAt: c.updatedAt ?? now }))
+      const logs = d.reviewLog.map((l: Record<string, unknown>) => ({ ...l, cardId: cardId(l.cardId), updatedAt: l.updatedAt ?? l.reviewedAt ?? now }))
+      const sets = d.settings.map((x: Record<string, unknown>) => ({ ...x, updatedAt: x.updatedAt ?? now }))
+      await db.transaction('rw', [db.cards, db.reviewLog, db.settings, db.userEntries, db.userExamples, db.userGlosses], async () => {
+        await db.cards.bulkPut(cards)
+        await db.reviewLog.bulkPut(logs)
+        await db.settings.bulkPut(sets)
+        await db.userEntries.bulkPut(d.userEntries ?? [])
+        await db.userExamples.bulkPut(d.userExamples ?? [])
+        await db.userGlosses.bulkPut(d.userGlosses ?? [])
       })
       setMsg(`Imported ${d.cards.length} cards, ${d.reviewLog.length} reviews.`)
     } catch (e) {
       setMsg('Import failed: ' + (e as Error).message)
+    }
+  }
+
+  async function doReverso(f: File) {
+    setRv({ busy: 'Reading…' })
+    try {
+      const sum = await importReverso(await f.text(), (n, t) => setRv({ busy: `Importing ${n} / ${t}…` }))
+      setRv({ sum })
+    } catch (e) {
+      setRv({ err: (e as Error).message })
     }
   }
 
@@ -87,6 +112,28 @@ export default function Settings() {
             onChange={e => { const f = e.target.files?.[0]; if (f) doImport(f); e.target.value = '' }} />
         </div>
         {msg && <p>{msg}</p>}
+      </div>
+      <div className="card" data-testid="reverso">
+        <h2>Reverso favorites</h2>
+        <div className="row">
+          <button onClick={() => csv.current?.click()} disabled={!!rv?.busy}>Import Reverso favorites (CSV)</button>
+          <input ref={csv} type="file" accept=".csv,text/csv" hidden data-testid="reverso-file"
+            onChange={e => { const f = e.target.files?.[0]; if (f) void doReverso(f); e.target.value = '' }} />
+        </div>
+        {rv?.busy && <p className="muted">{rv.busy}</p>}
+        {rv?.err && <p>Import failed: {rv.err}</p>}
+        {rv?.sum && (
+          <div data-testid="reverso-summary">
+            <p><strong>Import finished</strong> · {rv.sum.rows} rows</p>
+            <ul className="rv-gl">
+              <li><strong>{rv.sum.words}</strong> words added (not in the dictionary)</li>
+              <li><strong>{rv.sum.linked}</strong> linked to a dictionary lemma</li>
+              <li><strong>{rv.sum.phrases}</strong> phrases added</li>
+              <li><strong>{rv.sum.skipped}</strong> skipped (already imported, repeated or empty)</li>
+            </ul>
+            <small className="muted">{rv.sum.newCards} new cards created.</small>
+          </div>
+        )}
       </div>
       <div className="card">
         <h2>About / Credits</h2>

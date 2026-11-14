@@ -91,3 +91,7 @@ button.rv-rate.r1 { border-color: #dc2626; } button.rv-rate.r2 { border-color: #
 .chart .barv { width: 100%; background: var(--accent); border-radius: 3px 3px 0 0; }
 .chart .val { font-size: .62rem; color: var(--muted); height: 14px; line-height: 14px; }
 .chart .lbl { font-size: .62rem; color: var(--muted); height: 14px; line-height: 14px; white-space: nowrap; }
+
+a.choice-main { flex: 1; display: block; padding: 14px; min-height: 64px; color: inherit; text-decoration: none; }
+.rv-details-toggle { display: block; margin: 12px auto 0; }
+.yours { margin: -6px 0 8px; }

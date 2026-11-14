@@ -19,7 +19,7 @@ Tunables via env: `MAX_EX` (examples per lemma, default 25, spec cap 40), `PRUNE
 
 ```json
 {"version": "<date>-<hash>",
- "lemmas":   [{"id": 1, "lemma": "cercare", "pos": "verb", "glosses": ["to look for"]}],
+ "lemmas":   [{"id": 1, "lemma": "cercare", "pos": "verb", "glosses": ["to look for"], "freq": 123}],
  "forms":    [{"form": "cerco", "lemmaId": 1, "tags": "ind pres 1 sg"}],
  "examples": [{"id": 1, "lemmaId": 1, "form": "cerca", "it": "...", "en": "..."}]}
 ```
@@ -61,3 +61,12 @@ archaic/obsolete/regional are removed.
 - The kaikki.org "postprocessed" download used here is marked deprecated by its maintainer;
   if the URL disappears, switch `SOURCES["kaikki-italian.jsonl"]` to the raw wiktextract data
   (<https://kaikki.org/dictionary/rawdata.html>), whose structure is nearly identical.
+
+## Frequency, ambiguity and keep list
+
+- `lemmas[].freq`: Tatoeba token count of all the lemma's forms; tokens of a form shared by several
+  lemmas are split between them in proportion to their own freq (archaic-only lemmas weigh 50x less).
+- A sentence matched through an ambiguous form (same form, different headwords) is only used as an
+  example for the highest-freq lemma, unless it also contains an unambiguous form of the other lemma.
+- `keep_lemmas.txt` (optional, one lemma per line, `#` comments): kept even with zero examples.
+  `favorites_to_keep.py <Favorites.csv>` generates it from a Reverso export.

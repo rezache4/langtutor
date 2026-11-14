@@ -26,10 +26,10 @@ export default function Stats() {
   const s = useLiveQuery(async () => {
     const now = Date.now()
     const t0 = startOfDay(now)
-    const cards = await db.cards.toArray()
-    const logs = await db.reviewLog.where('reviewedAt').aboveOrEqual(t0 - 29 * DAY).toArray()
-    const allReviews = await db.reviewLog.count()
-    const learned = cards.filter(c => c.state !== 0)
+    const cards = (await db.cards.toArray()).filter(c => !c.deleted)
+    const logs = await db.reviewLog.where('reviewedAt').aboveOrEqual(t0 - 29 * DAY).filter(l => !l.deleted).toArray()
+    const allReviews = await db.reviewLog.filter(l => !l.deleted).count()
+    const learned = cards.filter(c => c.state !== 0 && !c.suspended)
     const forecast = Array.from({ length: 14 }, (_, i) => ({ n: 0, day: t0 + i * DAY }))
     for (const c of learned) {
       const i = Math.max(0, Math.round((startOfDay(c.due) - t0) / DAY))
@@ -40,7 +40,7 @@ export default function Stats() {
       const i = 29 - Math.round((t0 - startOfDay(l.reviewedAt)) / DAY)
       if (i >= 0 && i < 30) perDay[i].n++
     }
-    const rv = await db.reviewLog.filter(l => l.state === 2).toArray()
+    const rv = await db.reviewLog.filter(l => l.state === 2 && !l.deleted).toArray()
     const byState = [0, 0, 0, 0]
     for (const c of cards) byState[c.state] = (byState[c.state] ?? 0) + 1
     return {

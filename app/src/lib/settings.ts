@@ -13,7 +13,7 @@ export interface AppSettings {
 export const DEFAULTS: AppSettings = { newPerDay: 15, sessionSize: 20, frontMode: 'sentence', audioMode: 'tap', desiredRetention: 0.9 }
 
 export async function loadSettings(): Promise<AppSettings> {
-  const rows = await db.settings.toArray()
+  const rows = (await db.settings.toArray()).filter(r => !r.deleted)
   const m = new Map(rows.map(r => [r.key, r.value]))
   const out = { ...DEFAULTS } as Record<string, unknown>
   for (const k of Object.keys(DEFAULTS)) if (m.has(k) && m.get(k) != null) out[k] = m.get(k)
