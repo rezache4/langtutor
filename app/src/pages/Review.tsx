@@ -7,14 +7,15 @@ import { loadSettings, useSettings, type AppSettings } from '../lib/settings'
 import { buildQueue } from '../lib/queue'
 import { fmtInterval, relDue, nextReviewText } from '../lib/time'
 import { groupForms, labelsOf } from '../lib/tags'
-import { Highlighted, Speak } from '../lib/ui'
+import { CLAMP_LEN, ExLine, Speak } from '../lib/ui'
 import { isActive, putCard } from '../lib/cards'
 import { entryExamples, lemmaExamples, mergeGlosses, userGlossTexts } from '../lib/userdata'
 
 const LABEL: Record<number, string> = { 1: 'Again', 2: 'Hard', 3: 'Good', 4: 'Easy' }
 const RECENT = 12
+const TOAST_MS = 4000
 
-interface Undo { prev: CardRow; logId?: string; idx: number; requeued: boolean; rating?: Grade; msg: string }
+interface Undo { prev: CardRow; logId?: string; idx: number; requeued: boolean; rating?: Grade; msg: string; at: number; gen: number }
 interface Session {
   queue: string[]; idx: number; gen: number; reviewed: number
   counts: Record<number, number>
@@ -38,11 +39,15 @@ interface Cur {
   to: string // full page (word or entry)
 }
 
-/** Random example, never the one shown last time, biased towards ones not seen recently. */
+/** Random example, preferring <= 140 chars, never the one shown last time, biased towards ones not seen recently. */
 export function pickExample(examples: Ex[], card: CardRow): Ex | undefined {
-  if (examples.length <= 1) return examples[0]
+  if (!examples.length) return undefined
+  const short = examples.filter(e => e.it.length <= CLAMP_LEN)
+  const src = short.length ? short : examples
+  if (src.length <= 1) return src[0]
   const hist = card.seenExamples ?? (card.lastExampleId ? [card.lastExampleId] : [])
-  const pool = examples.filter(e => e.id !== card.lastExampleId)
+  const nonLast = src.filter(e => e.id !== card.lastExampleId)
+  const pool = nonLast.length ? nonLast : src
   const weight = (e: Ex) => {
     const i = hist.lastIndexOf(e.id)
     if (i < 0) return 1
@@ -124,11 +129,22 @@ export default function Review() {
     let on = true
     loadCur(cs, settings).then(c => {
       if (!on) return
-      if (c === 'gone') { cs.idx++; cs.exId = undefined; cs.gen++; bump(); return } // card deleted meanwhile
+      if (c === 'gone') { cs.idx++; cs.exId = undefined; cs.undo = null; cs.gen++; bump(); return } // card deleted meanwhile
       setCur(c)
     })
     return () => { on = false }
   }, [S?.gen, S?.queue, !!settings]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-dismiss undo toast after 4s.
+  useEffect(() => {
+    const u = S?.undo
+    if (!u) return
+    const ms = Math.max(0, TOAST_MS - (Date.now() - u.at))
+    const t = setTimeout(() => {
+      if (session?.undo === u) { session.undo = null; bump() }
+    }, ms)
+    return () => clearTimeout(t)
+  }, [S?.undo])
 
   // End / empty screen info.
   useEffect(() => {
@@ -149,8 +165,11 @@ export default function Review() {
   }, [ok, cur, front]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function reveal() { if (session) { session.phase = 'reveal'; session.open = false; session.again = false; bump() } }
-  function toggleDetails() { if (session && !session.again) { session.open = !session.open; bump() } }
-  const advance = (cs: Session) => { cs.idx++; cs.phase = 'front'; cs.open = false; cs.again = false; cs.exId = undefined; cs.gen++; setCur(null); bump() }
+  function toggleDetails() { if (session && !session.again) { session.open = !session.open; if (session.open) session.undo = null; bump() } }
+  const advance = (cs: Session, nextUndo: Undo | null = null) => {
+    cs.idx++; cs.phase = 'front'; cs.open = false; cs.again = false; cs.exId = undefined; cs.gen++; cs.undo = nextUndo
+    setCur(null); bump()
+  }
 
   /** Rate the current card. `label` replaces the toast label (used by "I know it"). */
   async function rate(r: Grade, label = LABEL[r]) {
@@ -176,8 +195,8 @@ export default function Review() {
       cs.reviewed++
       const requeue = next.state !== 2 && next.due - now < 10 * 60_000 // still (re)learning: see it again this session
       if (requeue) cs.queue.push(next.id)
-      cs.undo = { prev: cur.card, logId, idx: cs.idx, requeued: requeue, rating: r, msg: `${label} · next review ${relDue(next.due, now)}` }
-      advance(cs)
+      const nextUndo: Undo = { prev: cur.card, logId, idx: cs.idx, requeued: requeue, rating: r, msg: `${label} · next review ${relDue(next.due, now)}`, at: now, gen: cs.gen + 1 }
+      advance(cs, nextUndo)
     } finally { busy.current = false }
   }
 
@@ -188,8 +207,8 @@ export default function Review() {
     busy.current = true
     try {
       await putCard({ ...cur.card, suspended: 1 })
-      cs.undo = { prev: cur.card, idx: cs.idx, requeued: false, msg: `Marked “${cur.title}” as known · won’t be reviewed` }
-      advance(cs)
+      const nextUndo: Undo = { prev: cur.card, idx: cs.idx, requeued: false, msg: `Marked “${cur.title}” as known · won’t be reviewed`, at: Date.now(), gen: cs.gen + 1 }
+      advance(cs, nextUndo)
     } finally { busy.current = false }
   }
 
@@ -258,12 +277,12 @@ export default function Review() {
     <div className="rv-head">
       <span className="rv-progress">{Math.min(S.idx + 1, S.queue.length)} / {S.queue.length}</span>
       <div className="bar rv-bar"><div style={{ width: (S.idx / S.queue.length) * 100 + '%' }} /></div>
-      <button className="link" onClick={() => { S.idx = S.queue.length; S.gen++; bump() }}>End</button>
+      <button className="link" onClick={() => { S.idx = S.queue.length; S.undo = null; S.gen++; bump() }}>End</button>
     </div>
   )
   const sentenceBlock = ex && (
     <>
-      <div className="rv-sentence"><Highlighted text={ex.it} form={ex.form} /> <Speak text={ex.it} /></div>
+      <ExLine className="rv-sentence" text={ex.it} form={ex.form} />
       <div className="muted rv-en">{ex.en}</div>
     </>
   )
@@ -274,68 +293,70 @@ export default function Review() {
 
   return (
     <>
-      {header}
-      <div className="card rv-card">
-        {S.phase === 'front' ? (
-          showSentence ? (
-            <>
-              <div className="rv-sentence"><Highlighted text={ex!.it} form={ex!.form} /> <Speak text={ex!.it} /></div>
-              <p className="rv-prompt">What does <strong>{ex!.form}</strong> mean here?</p>
-            </>
+      <div className="rv-wrap">
+        {header}
+        <div className="card rv-card">
+          {S.phase === 'front' ? (
+            showSentence ? (
+              <>
+                <ExLine className="rv-sentence" text={ex!.it} form={ex!.form} />
+                <p className="rv-prompt">What does <strong>{ex!.form}</strong> mean here?</p>
+              </>
+            ) : (
+              <>
+                <div className="rv-lemma">{title} <Speak text={title} /></div>
+                <p className="rv-prompt">What does <strong>{title}</strong> mean?</p>
+              </>
+            )
           ) : (
             <>
-              <div className="rv-lemma">{title} <Speak text={title} /></div>
-              <p className="rv-prompt">What does <strong>{title}</strong> mean?</p>
+              {sentenceBlock}
+              <hr />
+              <div className="rv-lemma-sm">{title} <Speak text={title} /> {pos && <span className="tag">{pos}</span>}</div>
+              <div className="rv-gloss">{backGlosses.join('; ')}</div>
+              {formTags.length > 0 && <small className="subtle">{ex!.form}: {formTags.join(' / ')}</small>}
+              <div className="muted rv-next">{nextReviewText(card)}</div>
+              <button className="link rv-details-toggle" aria-expanded={detailsOpen} disabled={S.again} onClick={toggleDetails}>
+                Details {detailsOpen ? '▴' : '▾'}
+              </button>
             </>
-          )
-        ) : (
-          <>
-            {sentenceBlock}
-            <hr />
-            <div className="rv-lemma-sm">{title} <Speak text={title} /> {pos && <span className="tag">{pos}</span>}</div>
-            <div className="rv-gloss">{backGlosses.join('; ')}</div>
-            {formTags.length > 0 && <small className="subtle">{ex!.form}: {formTags.join(' / ')}</small>}
-            <div className="muted rv-next">{nextReviewText(card)}</div>
-            <button className="link rv-details-toggle" aria-expanded={detailsOpen} disabled={S.again} onClick={toggleDetails}>
-              Details {detailsOpen ? '▴' : '▾'}
-            </button>
-          </>
-        )}
-      </div>
-      {detailsOpen && (
-        <div className="rv-details" data-testid="details">
-          <div className="card">
-            <h2>All meanings</h2>
-            <ul className="rv-gl">
-              {cur.glosses.dict.map((g, i) => <li key={'d' + i}>{g}</li>)}
-              {cur.glosses.user.map((g, i) => <li key={'u' + i}>{g} <small className="subtle">· yours</small></li>)}
-            </ul>
-          </div>
-          {cur.others.length > 0 && (
-            <div className="card">
-              <h2>More examples</h2>
-              {cur.others.map(o => (
-                <div key={o.id} className="rv-other">
-                  <div><Highlighted text={o.it} form={o.form} /> <Speak text={o.it} /></div>
-                  <div className="muted">{o.en}</div>
-                </div>
-              ))}
-            </div>
           )}
-          {groups.length > 0 && (
-            <div className="card">
-              <h2>Forms</h2>
-              {groups.map(([g, fs]) => (
-                <div key={g} className="rv-forms"><small className="muted">{g}</small> {fs.slice(0, 14).join(', ')}{fs.length > 14 ? ` +${fs.length - 14}` : ''}</div>
-              ))}
-            </div>
-          )}
-          <p><Link to={cur.to + (isLemma && ex ? `&form=${encodeURIComponent(ex.form)}` : '')}
-            state={{ fromReview: true, form: ex?.form }}>Open the full {isLemma ? 'word' : 'entry'} page →</Link></p>
-          <p><button className="link" onClick={markKnown}>Mark as known (stop reviewing)</button></p>
         </div>
-      )}
-      {undoBar}
+        {detailsOpen && (
+          <div className="rv-details" data-testid="details">
+            <div className="card">
+              <h2>All meanings</h2>
+              <ul className="rv-gl">
+                {cur.glosses.dict.map((g, i) => <li key={'d' + i}>{g}</li>)}
+                {cur.glosses.user.map((g, i) => <li key={'u' + i}>{g} <small className="subtle">· yours</small></li>)}
+              </ul>
+            </div>
+            {cur.others.length > 0 && (
+              <div className="card">
+                <h2>More examples</h2>
+                {cur.others.map(o => (
+                  <div key={o.id} className="rv-other">
+                    <ExLine text={o.it} form={o.form} />
+                    <div className="muted">{o.en}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {groups.length > 0 && (
+              <div className="card">
+                <h2>Forms</h2>
+                {groups.map(([g, fs]) => (
+                  <div key={g} className="rv-forms"><small className="muted">{g}</small> {fs.slice(0, 14).join(', ')}{fs.length > 14 ? ` +${fs.length - 14}` : ''}</div>
+                ))}
+              </div>
+            )}
+            <p><Link to={cur.to + (isLemma && ex ? `&form=${encodeURIComponent(ex.form)}` : '')}
+              state={{ fromReview: true, form: ex?.form }}>Open the full {isLemma ? 'word' : 'entry'} page →</Link></p>
+            <p><button className="link" onClick={markKnown}>Mark as known (stop reviewing)</button></p>
+          </div>
+        )}
+        {!detailsOpen && undoBar}
+      </div>
       <div className="rv-actions">
         {S.phase === 'front' ? (
           <>
@@ -347,7 +368,7 @@ export default function Review() {
         ) : (
           GRADES.map(g => (
             <button key={g} className={'rv-rate r' + g}
-              onClick={() => { if (g === Rating.Again) { S.again = true; bump() } else void rate(g) }}>
+              onClick={() => { if (g === Rating.Again) { S.again = true; S.undo = null; bump() } else void rate(g) }}>
               <span>{LABEL[g]}</span><small>{fmtInterval(cur.prev[g].due - Date.now())}</small>
             </button>
           ))

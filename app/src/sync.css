@@ -1,0 +1,4 @@
+.account .acct-email { font-weight: 600; word-break: break-all; }
+.account .acct-status { font-size: 0.85em; margin: 0.4em 0 0; }
+.account .acct-status.err { color: #e5534b; }
+.account .acct-status.ok { color: #3fb950; }

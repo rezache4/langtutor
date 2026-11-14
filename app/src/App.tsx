@@ -1,15 +1,16 @@
-import { NavLink, Route, Routes } from 'react-router-dom'
+import { NavLink, Route, Routes, useLocation } from 'react-router-dom'
 import Search from './pages/Search'
 import Word from './pages/Word'
 import Entry from './pages/Entry'
 import Review from './pages/Review'
 import Stats from './pages/Stats'
 import Settings from './pages/Settings'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { loadBundle, type Progress } from './data/loader'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useSettings } from './lib/settings'
 import { availableCount } from './lib/queue'
+import { startSync, syncSoon } from './lib/sync'
 
 const tabs = [
   { to: '/', label: 'Search', icon: '\u{1F50D}' },
@@ -26,6 +27,11 @@ export default function App() {
     loadBundle(p => { if (on) setProg(p) }).catch(() => { /* offline or no bundle */ }).finally(() => { if (on) setReady(true) })
     return () => { on = false }
   }, [])
+  useEffect(() => { startSync() }, [])
+  // Leaving the review screen = a session just ended: sync shortly after.
+  const path = useLocation().pathname
+  const prevPath = useRef(path)
+  useEffect(() => { if (prevPath.current === '/review' && path !== '/review') syncSoon(3000); prevPath.current = path }, [path])
   const settings = useSettings()
   const [tick, setTick] = useState(0)
   useEffect(() => { const t = setInterval(() => setTick(x => x + 1), 30_000); return () => clearInterval(t) }, [])

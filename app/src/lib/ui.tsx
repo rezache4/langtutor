@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import { speak } from './tts'
 import { useAudioMode } from './settings'
 
 export const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+export const CLAMP_LEN = 140
 
 export function Highlighted({ text, form }: { text: string; form: string }) {
   if (!form) return <>{text}</>
@@ -18,4 +20,25 @@ export function Speak({ text }: { text: string }) {
   const mode = useAudioMode()
   if (!hasTTS || mode === 'off') return null
   return <button className="icon" onClick={() => speak(text)} aria-label="Play audio">🔊</button>
+}
+
+/** Sentence line clamped to 3 lines when longer than ~140 chars, with a 'more' tap to expand. */
+export function ExLine({ text, form, className }: { text: string; form: string; className?: string }) {
+  const [exp, setExp] = useState(false)
+  const [prev, setPrev] = useState(text)
+  if (text !== prev) { setPrev(text); setExp(false) }
+  const clamped = text.length > CLAMP_LEN && !exp
+  return (
+    <div className={className}>
+      <span className={clamped ? 'clamp3' : undefined} onClick={clamped ? () => setExp(true) : undefined}>
+        <Highlighted text={text} form={form} />
+        {!clamped && <> <Speak text={text} /></>}
+      </span>
+      {clamped && (
+        <span className="clamp-more">
+          <button type="button" className="link" onClick={() => setExp(true)}>more</button> <Speak text={text} />
+        </span>
+      )}
+    </div>
+  )
 }

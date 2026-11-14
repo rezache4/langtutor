@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { db, setSetting } from '../db/schema'
 import { DEFAULTS, useSettings } from '../lib/settings'
-import { syncEnabled } from '../lib/supabase'
+import AccountCard from './AccountCard'
 import { importReverso, type ImportSummary } from '../lib/reverso'
 
 const opts = (list: number[], cur: number) => (list.includes(cur) ? list : [...list, cur].sort((a, b) => a - b))
@@ -135,12 +135,12 @@ export default function Settings() {
           </div>
         )}
       </div>
+      <AccountCard />
       <div className="card">
         <h2>About / Credits</h2>
         <p>Example sentences: <a href="https://tatoeba.org" target="_blank" rel="noreferrer">Tatoeba</a>, licensed CC BY 2.0 FR.</p>
         <p>Dictionary data: <a href="https://en.wiktionary.org" target="_blank" rel="noreferrer">Wiktionary</a> via <a href="https://kaikki.org" target="_blank" rel="noreferrer">kaikki.org</a> / wiktextract, licensed CC BY-SA 4.0.</p>
       </div>
-      <p className="muted">Sync: {syncEnabled ? 'configured' : 'disabled (no Supabase env)'}</p>
     </>
   )
 }

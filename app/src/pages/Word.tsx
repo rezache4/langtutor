@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useLocation, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type Ex } from '../db/schema'
-import { Highlighted, Speak } from '../lib/ui'
+import { ExLine, Speak } from '../lib/ui'
 import { isLive } from '../lib/cards'
 import { CardControls } from '../lib/CardControls'
 import { formLabel, rankForm, wordUrl } from '../lib/lookup'
@@ -112,7 +112,7 @@ export default function Word() {
         const labels = [...new Set(labelsOf((tagsOf.get(e.form) ?? []).join(' | ')))].slice(0, 2)
         return (
           <div key={e.id} className="card">
-            <div><Highlighted text={e.it} form={e.form} /> <Speak text={e.it} /></div>
+            <ExLine text={e.it} form={e.form} />
             <div className="muted">{e.en}</div>
             {labels.length > 0 && <small className="subtle">{e.form}: {labels.join(' / ')}</small>}
           </div>

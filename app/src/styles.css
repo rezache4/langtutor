@@ -69,14 +69,15 @@ span.choice-add { padding: 0 6px; }
 .rv-other:first-of-type { border-top: 0; }
 .rv-forms { margin: 4px 0; }
 .rv-forms small { display: inline-block; min-width: 82px; }
-.rv-spacer { height: 100px; }
+.rv-wrap { min-height: calc(100dvh - var(--tab-h) - env(safe-area-inset-bottom) - 116px); display: flex; flex-direction: column; }
+.rv-spacer { height: 92px; }
 .rv-actions { position: fixed; left: 50%; transform: translateX(-50%); width: 100%; max-width: 640px; bottom: calc(var(--tab-h) + env(safe-area-inset-bottom)); display: flex; gap: 8px; padding: 10px 16px; background: var(--bg); border-top: 1px solid var(--border); z-index: 5; }
 button.rv-big { flex: 1; min-height: 60px; font-size: 1.05rem; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.2; }
 button.rv-big small { opacity: .8; font-size: .75rem; }
 button.rv-rate { flex: 1; min-height: 66px; padding: 0 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.25; font-weight: 600; border-width: 2px; }
 button.rv-rate small { font-weight: 400; color: var(--muted); font-size: .8rem; }
 button.rv-rate.r1 { border-color: #dc2626; } button.rv-rate.r2 { border-color: #d97706; } button.rv-rate.r3 { border-color: #16a34a; } button.rv-rate.r4 { border-color: #2563eb; }
-.rv-undo { position: fixed; left: 50%; transform: translateX(-50%); width: calc(100% - 32px); max-width: 608px; bottom: calc(var(--tab-h) + env(safe-area-inset-bottom) + 84px); display: flex; justify-content: space-between; align-items: center; padding: 2px 14px; border-radius: 12px; background: var(--text); color: var(--bg); font-size: .9rem; z-index: 6; }
+.rv-undo { margin-top: auto; width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 4px 14px; border-radius: 12px; background: var(--text); color: var(--bg); font-size: .9rem; }
 .rv-undo button.link { color: var(--bg); font-weight: 700; text-decoration: underline; }
 .rv-counts, .states { display: flex; gap: 8px; }
 .rv-count, .st { flex: 1; text-align: center; border: 1px solid var(--border); border-radius: 10px; padding: 8px 2px; display: flex; flex-direction: column; }
@@ -95,3 +96,17 @@ button.rv-rate.r1 { border-color: #dc2626; } button.rv-rate.r2 { border-color: #
 a.choice-main { flex: 1; display: block; padding: 14px; min-height: 64px; color: inherit; text-decoration: none; }
 .rv-details-toggle { display: block; margin: 12px auto 0; }
 .yours { margin: -6px 0 8px; }
+
+/* Autocomplete */
+.ac-list { margin: 8px 0 12px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); overflow: hidden; }
+button.ac-row { width: 100%; min-height: 54px; padding: 12px 14px; border: 0; border-top: 1px solid var(--border); border-radius: 0; background: transparent; display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; text-align: left; }
+button.ac-row:first-child { border-top: 0; }
+button.ac-row:hover, button.ac-row.active { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.ac-form { font-weight: 700; font-size: 1.05rem; }
+.ac-arrow { font-size: .95rem; }
+.ac-lemma { font-weight: 600; }
+.ac-label { font-size: .9rem; }
+
+/* Long example clamp */
+.clamp3 { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
+.clamp-more { display: inline-flex; align-items: center; gap: 4px; }

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { db, type Ex } from '../db/schema'
-import { Highlighted, Speak } from '../lib/ui'
+import { ExLine, Speak } from '../lib/ui'
 import { isLive, softDeleteEntry } from '../lib/cards'
 import { CardControls } from '../lib/CardControls'
 import { entryExamples } from '../lib/userdata'
@@ -43,7 +43,7 @@ export default function Entry() {
       {examples?.length === 0 && <p className="muted">No examples.</p>}
       {examples?.map(x => (
         <div key={x.id} className="card">
-          <div><Highlighted text={x.it} form={x.form} /> <Speak text={x.it} /></div>
+          <ExLine text={x.it} form={x.form} />
           <div className="muted">{x.en}</div>
           {x.user && <small className="subtle">From your Reverso favorites</small>}
         </div>
