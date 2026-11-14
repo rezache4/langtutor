@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react'
-import { useLocation, useParams, useSearchParams } from 'react-router-dom'
+import { useParams, useLocation, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type Example } from '../db/schema'
 import { newCard } from '../lib/fsrs'
 import { speak } from '../lib/tts'
+import { GROUPS, codesOf, groupOf, labelsOf, type TagGroup } from '../lib/tags'
 
 const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+const hasTTS = typeof window !== 'undefined' && 'speechSynthesis' in window
 
 function Highlighted({ text, form }: { text: string; form: string }) {
   if (!form) return <>{text}</>
@@ -13,6 +15,11 @@ function Highlighted({ text, form }: { text: string; form: string }) {
   const m = re.exec(text)
   if (!m) return <>{text}</>
   return <>{text.slice(0, m.index)}<mark>{m[1]}</mark>{text.slice(m.index + m[1].length)}</>
+}
+
+function Speak({ text }: { text: string }) {
+  if (!hasTTS) return null
+  return <button className="icon" onClick={() => speak(text)} aria-label="Play">🔊</button>
 }
 
 function shuffle<T>(a: T[]): T[] {
@@ -25,8 +32,11 @@ export default function Word() {
   const { lemma = '' } = useParams()
   const [sp] = useSearchParams()
   const id = Number(sp.get('id')) || 0
-  const hl = (useLocation().state as { form?: string } | null)?.form
-  const [chip, setChip] = useState<string | null>(hl ?? null)
+  const stateForm = (useLocation().state as { form?: string } | null)?.form
+  const hl = (sp.get('form') ?? stateForm ?? '').toLowerCase()
+  const [chip, setChip] = useState<string | null>(null)
+  const [open, setOpen] = useState(false)
+  const [moreGl, setMoreGl] = useState(false)
   const data = useLiveQuery(async () => {
     let l = id ? await db.lemmas.get(id) : undefined
     if (!l || l.lemma !== lemma) l = await db.lemmas.where('lemma').equals(lemma).first()
@@ -39,52 +49,74 @@ export default function Word() {
 
   const lemmaId = data?.l.id
   const nEx = data?.examples.length
-  const shuffled = useMemo<Example[]>(() => shuffle(data?.examples ?? []), [lemmaId, nEx]) // eslint-disable-line react-hooks/exhaustive-deps
+  const shuffled = useMemo<Example[]>(() => {
+    const s = shuffle(data?.examples ?? [])
+    if (!hl) return s
+    return [...s.filter(e => e.form === hl), ...s.filter(e => e.form !== hl)] // searched form first
+  }, [lemmaId, nEx, hl]) // eslint-disable-line react-hooks/exhaustive-deps
   const tagsOf = useMemo(() => {
-    const m = new Map<string, string>()
-    for (const f of data?.forms ?? []) {
-      const t = Array.isArray(f.tags) ? (f.tags as string[]).join(' ') : f.tags
-      const prev = m.get(f.form)
-      m.set(f.form, prev && t ? `${prev} / ${t}` : prev ?? t)
-    }
+    const m = new Map<string, string[]>()
+    for (const f of data?.forms ?? []) m.set(f.form, [...(m.get(f.form) ?? []), ...codesOf(f.tags)])
     return m
   }, [data?.forms])
-  const chips = useMemo(() => {
+  const grouped = useMemo(() => {
     const c = new Map<string, number>()
     for (const e of data?.examples ?? []) c.set(e.form, (c.get(e.form) ?? 0) + 1)
-    return [...c.entries()].sort((a, b) => b[1] - a[1])
-  }, [data?.examples])
+    const g = new Map<TagGroup, [string, number][]>()
+    for (const [f, n] of [...c.entries()].sort((a, b) => b[1] - a[1])) {
+      const code = (tagsOf.get(f) ?? []).find(x => labelsOf(x).length)
+      const grp = code ? groupOf(code) : 'Other'
+      g.set(grp, [...(g.get(grp) ?? []), [f, n]])
+    }
+    return GROUPS.filter(x => g.has(x)).map(x => [x, g.get(x)!] as const)
+  }, [data?.examples, tagsOf])
 
   if (data === undefined) return null
   if (data === null) return <><h1>{lemma}</h1><p className="muted">Not found.</p></>
   const { l, card } = data
-  const active = chip && chips.some(([f]) => f === chip) ? chip : null // searched form may have no examples
+  const active = chip && data.examples.some(e => e.form === chip) ? chip : null
   const shown = active ? shuffled.filter(e => e.form === active) : shuffled
+  const gl = moreGl ? l.glosses : l.glosses.slice(0, 3)
   return (
     <>
-      <h1>{l.lemma} <button onClick={() => speak(l.lemma)} aria-label="Play">Play</button></h1>
-      <p className="muted"><span className="tag">{l.pos}</span> {l.glosses.join('; ')}</p>
+      <h1>{l.lemma} <Speak text={l.lemma} /></h1>
+      <p className="muted"><span className="tag">{l.pos}</span> {gl.join('; ')}
+        {l.glosses.length > 3 && <> <button className="link" onClick={() => setMoreGl(!moreGl)}>{moreGl ? 'less' : `more (${l.glosses.length - 3})`}</button></>}
+      </p>
       <button className="primary" disabled={!!card} onClick={() => db.cards.put(newCard(l.id))}>
         {card ? 'In review deck' : 'Add to review'}
       </button>
       <h2>Examples ({shown.length})</h2>
-      {chips.length > 0 && (
-        <div className="row chips">
-          <button className={'chip' + (active === null ? ' on' : '')} onClick={() => setChip(null)}>all</button>
-          {chips.map(([f, n]) => (
-            <button key={f} className={'chip' + (active === f ? ' on' : '')}
-              onClick={() => setChip(active === f ? null : f)}>{f} <small>{n}</small></button>
+      {grouped.length > 0 && (
+        <div className="filter">
+          <button className="link" aria-expanded={open} onClick={() => setOpen(!open)}>
+            Filter by form{active ? `: ${active}` : ''} {open ? '▴' : '▾'}
+          </button>
+          {active && <button className="link" onClick={() => setChip(null)}>clear</button>}
+          {open && grouped.map(([g, items]) => (
+            <div key={g} className="group">
+              <small className="muted">{g}</small>
+              <div className="row chips">
+                {items.map(([f, n]) => (
+                  <button key={f} className={'chip' + (active === f ? ' on' : '')}
+                    onClick={() => { setChip(active === f ? null : f); setOpen(false) }}>{f} <small>{n}</small></button>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       )}
       {shown.length === 0 && <p className="muted">No examples.</p>}
-      {shown.map(e => (
-        <div key={e.id} className="card">
-          <div><Highlighted text={e.it} form={e.form} /> <button onClick={() => speak(e.it)} aria-label="Play">Play</button></div>
-          <div className="muted">{e.en}</div>
-          {tagsOf.get(e.form) && <small className="subtle">{e.form}: {tagsOf.get(e.form)}</small>}
-        </div>
-      ))}
+      {shown.map(e => {
+        const labels = [...new Set(labelsOf((tagsOf.get(e.form) ?? []).join(' | ')))].slice(0, 2)
+        return (
+          <div key={e.id} className="card">
+            <div><Highlighted text={e.it} form={e.form} /> <Speak text={e.it} /></div>
+            <div className="muted">{e.en}</div>
+            {labels.length > 0 && <small className="subtle">{e.form}: {labels.join(' / ')}</small>}
+          </div>
+        )
+      })}
     </>
   )
 }

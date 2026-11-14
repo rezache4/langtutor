@@ -31,3 +31,9 @@ button.choice { display: block; width: 100%; text-align: left; padding: 14px; }
 .splash { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px; text-align: center; }
 .bar { width: min(320px, 80vw); height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
 .bar > div { height: 100%; background: var(--accent); transition: width .15s; }
+button.icon { min-height: 32px; min-width: 32px; padding: 0 6px; border-radius: 16px; font-size: .9rem; vertical-align: middle; background: transparent; }
+button.link { min-height: 32px; padding: 0 4px; border: 0; background: none; color: var(--accent); font-size: .95rem; }
+.filter { margin: 4px 0 8px; }
+.filter .group { margin-top: 6px; }
+.filter .chips { margin: 2px 0 4px; }
+h2 { font-size: 1.1rem; margin: 12px 0 4px; }

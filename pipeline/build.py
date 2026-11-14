@@ -33,7 +33,7 @@ SOURCES = {
 }
 
 MAX_EX = int(os.environ.get("MAX_EX", 25))   # examples per lemma (spec cap 40; 25 keeps bundle <50 MB)
-MAX_GLOSSES = 5
+MAX_GLOSSES = 8
 MAX_GLOSS_LEN = 100
 MIN_W, MAX_W = 4, 15                          # preferred sentence length (words)
 HARD_MAX_W = 25
@@ -59,40 +59,70 @@ def log(*a):
     print(f"[{time.strftime('%H:%M:%S')}]", *a, flush=True)
 
 
-RARE_TAGS = {"archaic", "obsolete", "poetic", "literary", "dialectal", "rare", "dated",
-             "regional", "Tuscany", "misspelling", "proscribed", "uncommon", "nonstandard",
-             "error-unknown-tag", "error-lua-exec"}
-TAG_ABBR = {"first-person": "1", "second-person": "2", "third-person": "3",
-            "second-person-semantically": "", "singular": "sg", "plural": "pl",
-            "indicative": "ind", "subjunctive": "sub", "imperative": "imp",
-            "conditional": "cond", "present": "pres", "imperfect": "impf", "past": "past",
-            "historic": "hist", "future": "fut", "participle": "ptcp", "gerund": "ger",
-            "infinitive": "inf", "masculine": "m", "feminine": "f", "negative": "neg",
-            "formal": "fml", "reflexive": "refl", "alternative": "alt",
-            "diminutive": "dim", "superlative": "sup", "augmentative": "aug",
-            "by-personal-gender": "", "error-unknown-tag": "", "error-lua-exec": "",
-            "Traditional": "", "traditional": "", "common": ""}
-TAG_ORDER = ["inf", "ger", "ptcp", "ind", "sub", "imp", "cond", "pres", "impf", "hist",
-             "past", "fut", "neg", "fml", "1", "2", "3", "m", "f", "sg", "pl"]
+RARE_TAGS = {"archaic", "obsolete", "poetic", "dialectal", "regional", "Tuscany", "dated",
+             "misspelling", "proscribed", "nonstandard", "error-unknown-tag", "error-lua-exec"}
+MOODS = {"indicative": "ind", "subjunctive": "sub", "imperative": "imp", "conditional": "cond"}
+TENSES = {"present": "pres", "imperfect": "impf", "historic": "hist", "future": "fut"}
+PERSONS = {"first-person": "1", "second-person": "2", "third-person": "3"}
+NUMBERS = {"singular": "s", "plural": "p"}
+GENDERS = {"masculine": "m", "feminine": "f"}
+MODS = {"diminutive": "dim", "superlative": "sup", "augmentative": "aug"}
+MOOD_PRIO = ["inf", "ger", "ptcp", "ind", "cond", "sub", "imp"]
+GLOSS_NOTE_RE = re.compile(
+    r"^(inflection of|.{0,40}form of|.{0,60}(participle|plural|singular|person|tense|"
+    r"gerund|infinitive).{0,60}of)", re.I)
 
 
-def compact_tags(sets):
-    """Drop tag sets that are subsets of another; abbreviate; at most MAX_TAGSETS, ' | ' separated."""
-    sets = list(set(sets))
-    sets = [s for s in sets if not any(s < o for o in sets)]
+def canon_tags(tags):
+    """Wiktionary tag set -> compact code ('ind.pres.1s', 'cond.3s', 'ptcp.past', 'ger', 'inf',
+    'f.pl'), or '' if nothing recognisable. Qualifiers (alt, apocopic, abbreviation...) ignored."""
+    t = set(tags)
+    if "infinitive" in t:
+        return "inf"
+    if "gerund" in t:
+        return "ger"
+    gn = [GENDERS[x] for x in t if x in GENDERS]
+    nm = [NUMBERS[x] for x in t if x in NUMBERS]
+    if "participle" in t:
+        tense = "pres" if "present" in t and "past" not in t else "past"
+        return ".".join(["ptcp", tense] + (gn if len(gn) == 1 else []) + (nm if len(nm) == 1 else []))
+    mood = next((MOODS[x] for x in MOODS if x in t), None)
+    tense = next((TENSES[x] for x in ("historic", "imperfect", "future", "present") if x in t), None)
+    if "past" in t and tense is None and mood in (None, "ind"):
+        tense = "hist"
+    pers = sorted(PERSONS[x] for x in t if x in PERSONS)
+    if mood is None and tense and pers:
+        mood = "ind"
+    if mood:
+        if mood == "imp":
+            parts = ["imp"]
+        elif mood == "cond":
+            parts = ["cond"]
+        else:
+            parts = [mood] + ([tense] if tense else [])
+        if pers and nm:
+            parts.append(pers[-1] + nm[0] if "formal" not in t else "3" + nm[0])
+        return ".".join(parts)
+    parts = sorted(gn) + sorted(nm) + [MODS[x] for x in MODS if x in t]
+    return ".".join(parts)
+
+
+def best_tags(sets):
+    """sets: iterable of frozensets. Returns (drop, code string). Drop if every set is rare-only."""
+    sets = [s for s in sets if s]
+    if not sets:
+        return False, ""
+    if all(s & RARE_TAGS for s in sets):
+        return True, ""
+    sets = [s for s in sets if not (s & RARE_TAGS)]
     if len(sets) > 1:   # negative-imperative rows only repeat other forms
-        non_neg = [s for s in sets if "negative" not in s]
-        sets = non_neg or sets
-    out = []
-    for s in sets:
-        ab = [TAG_ABBR.get(t, t) for t in s]
-        ab = [a for a in ab if a]
-        ab.sort(key=lambda a: (TAG_ORDER.index(a) if a in TAG_ORDER else 99, a))
-        txt = " ".join(ab)
-        if txt and txt not in out:
-            out.append(txt)
-    out.sort(key=lambda t: (len(t), t))
-    return " | ".join(out[:MAX_TAGSETS])
+        sets = [s for s in sets if "negative" not in s] or sets
+    codes = {canon_tags(s) for s in sets} - {""}
+
+    def key(c):
+        h = c.split(".")[0]
+        return (MOOD_PRIO.index(h) if h in MOOD_PRIO else 99, len(c), c)
+    return False, " | ".join(sorted(codes, key=key)[:MAX_TAGSETS])
 
 
 # ------------------------------------------------------------------ download
@@ -204,7 +234,7 @@ def parse_kaikki(path):
                 gl = s.get("glosses") or []
                 if gl:
                     g = short_gloss(gl[0])
-                    if g and g not in glosses:
+                    if g and not GLOSS_NOTE_RE.match(g) and g not in glosses:
                         glosses.append(g)
             if not glosses:
                 continue
@@ -281,10 +311,14 @@ def build():
     # ---- sentences: per surface token keep best POOL_PER_FORM sentences
     pairs = load_pairs()
     tok_sents = defaultdict(list)       # token -> [sentence idx]
+    freq = defaultdict(int)             # surface form -> number of Tatoeba sentences containing it
     sent_rank = []                       # idx -> (lens, nwords)
     for si, (it, _en) in enumerate(pairs):
         words = [t for t in tokenize(it) if not t.endswith("'")]
         nw = len(words)
+        for t in set(words):
+            if t in form_map:
+                freq[t] += 1
         if nw < 2 or nw > HARD_MAX_W:
             sent_rank.append(None)
             continue
@@ -299,33 +333,39 @@ def build():
     del tok_sents
     log(f"sentence index built: {len(pool)} matched surface forms ({time.time() - t0:.0f}s)")
 
-    # ---- per-lemma selection: round-robin across forms
+    # ---- per-lemma selection: frequency-weighted (D'Hondt) across forms; every one of the top
+    # MIN_TOP forms gets at least one example; no form may take more than MAX_SHARE of the total.
     lemma_forms = defaultdict(list)
     for form, lm in form_map.items():
         if form in pool:
             for lid in lm:
                 lemma_forms[lid].append(form)
+    MIN_TOP, MAX_SHARE = 6, 0.4
+    cap = max(1, int(MAX_EX * MAX_SHARE))
     chosen = {}
     for lid, fl in lemma_forms.items():
-        fl.sort(key=lambda f: (sent_rank[pool[f][0]], f))   # forms with shortest best sentence first
-        idx = dict.fromkeys(fl, 0)
+        fl.sort(key=lambda f: (-freq[f], f))
+        ptr = dict.fromkeys(fl, 0)
+        quota = dict.fromkeys(fl, 0)
         used, picked = set(), []
+
+        def take(f):
+            p, i = pool[f], ptr[f]
+            while i < len(p) and p[i] in used:
+                i += 1
+            ptr[f] = i
+            if i >= len(p):
+                return False
+            used.add(p[i]); picked.append((p[i], f)); ptr[f] = i + 1; quota[f] += 1
+            return True
+        for f in fl[:MIN_TOP]:
+            if len(picked) < MAX_EX:
+                take(f)
         while len(picked) < MAX_EX:
-            progressed = False
-            for f in fl:
-                if len(picked) >= MAX_EX:
+            for f in sorted((f for f in fl if quota[f] < cap), key=lambda f: (-freq[f] / (quota[f] + 1), f)):
+                if take(f):
                     break
-                p = pool[f]
-                i = idx[f]
-                while i < len(p) and p[i] in used:
-                    i += 1
-                if i < len(p):
-                    used.add(p[i])
-                    picked.append((p[i], f))
-                    i += 1
-                    progressed = True
-                idx[f] = i
-            if not progressed:
+            else:
                 break
         chosen[lid] = picked
     log(f"selected examples for {len(chosen)} lemmas")
@@ -345,12 +385,12 @@ def build():
             if lid not in kept:
                 continue
             sets = [frozenset(t.split()) for t in form_map[form][lid] if t]
-            # drop unattested forms that are only rare/archaic/etc.
-            if sets and form not in pool and all(s & RARE_TAGS for s in sets):
+            drop, tags = best_tags(sets)
+            if drop:           # only obsolete/archaic/regional/etc.
                 dropped_rare += 1
                 continue
-            forms.append({"form": form, "lemmaId": lid, "tags": compact_tags(sets)})
-    log(f"dropped {dropped_rare} unattested rare/archaic forms")
+            forms.append({"form": form, "lemmaId": lid, "tags": tags})
+    log(f"dropped {dropped_rare} rare/archaic forms")
     examples, eid = [], 0
     for lid in sorted(chosen):
         if lid not in kept:

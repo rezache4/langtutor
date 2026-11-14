@@ -25,15 +25,16 @@ Tunables via env: `MAX_EX` (examples per lemma, default 25, spec cap 40), `PRUNE
 ```
 
 A form may appear several times with different `lemmaId`s (ambiguity, e.g. `era`).
-`tags` are abbreviated Wiktionary tags (1/2/3 person, sg/pl, ind/sub/imp/cond, pres/impf/hist/fut,
-ptcp/ger/inf, m/f); up to 3 alternative tag sets separated by ` | `.
+`tags` are canonical codes (`ind.pres.1s`, `cond.3s`, `sub.impf.2p`, `imp.2s`, `ptcp.past`, `ger`, `inf`, `f.pl`),
+up to 3 alternatives separated by ` | `. Qualifiers (alt, apocopic...) are dropped; forms that are only
+archaic/obsolete/regional are removed.
 `examples[].form` is the surface token that matched.
 
 ## What the build does
 
 1. Sources: Tatoeba ita/eng sentences + ita-eng links; kaikki.org Italian JSONL (stream-parsed).
 2. Lemmas: single-word, lowercase entries; proper nouns (`name`, capitalised), affixes, phrases,
-   proverbs, abbreviations skipped. Max 5 glosses (first gloss of each sense, trimmed to 100 chars).
+   proverbs, abbreviations skipped. Max 8 glosses (first gloss of each sense, trimmed to 100 chars; "inflection of"/"form of" notes dropped).
    Pure form-of entries are not lemmas.
 3. Forms: the `forms` tables of each lemma, plus every `form-of` / `alt-of` sense (so `vado` ->
    `andare` even when it is not in the table) and clitic compounds (`amarlo` -> `amare`).
@@ -43,7 +44,7 @@ ptcp/ger/inf, m/f); up to 3 alternative tag sets separated by ` | `.
 4. Matching: lowercase tokenisation, elisions split (`l'acqua` -> `l'`, `acqua`; the clitic is
    ignored). Every token is looked up in the form map; the sentence is attached to every lemma
    the token may belong to. Up to `MAX_EX` examples per lemma, sentences of 4-15 words preferred,
-   round-robin across forms for diversity. Duplicate Italian sentences removed.
+   allocated across forms proportionally to Tatoeba form frequency (D'Hondt; min 1 for the top 6 forms, max 40% per form). Duplicate Italian sentences removed.
 5. Size control: lemmas that never appear in a Tatoeba sentence are dropped with their forms.
 
 ## Sources and licenses

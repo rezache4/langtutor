@@ -11,7 +11,7 @@ export default function Search() {
   const count = useLiveQuery(() => db.lemmas.count(), [])
 
   const go = (l: Lemma, form: string) =>
-    nav(`/word/${encodeURIComponent(l.lemma)}?id=${l.id}`, { state: { form } })
+    nav(`/word/${encodeURIComponent(l.lemma)}?id=${l.id}&form=${encodeURIComponent(form)}`, { state: { form } })
 
   async function onChange(v: string) {
     setQ(v)
