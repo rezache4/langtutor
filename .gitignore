@@ -5,3 +5,6 @@ dist
 pipeline/raw
 pipeline/out
 app/public/data/bundle.json
+pipeline/keep_lemmas.txt
+__pycache__
+*.pyc
