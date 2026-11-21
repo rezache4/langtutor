@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/schema'
+import { isLive } from '../lib/cards'
 import { DAY, endOfDay, startOfDay } from '../lib/time'
 
 function Bars({ data, labelEvery = 1, label }: { data: { n: number; day: number }[]; labelEvery?: number; label: (d: number) => string }) {
@@ -26,7 +27,7 @@ export default function Stats() {
   const s = useLiveQuery(async () => {
     const now = Date.now()
     const t0 = startOfDay(now)
-    const cards = (await db.cards.toArray()).filter(c => !c.deleted)
+    const cards = (await db.cards.toArray()).filter(isLive)
     const logs = await db.reviewLog.where('reviewedAt').aboveOrEqual(t0 - 29 * DAY).filter(l => !l.deleted).toArray()
     const allReviews = await db.reviewLog.filter(l => !l.deleted).count()
     const learned = cards.filter(c => c.state !== 0 && !c.suspended)

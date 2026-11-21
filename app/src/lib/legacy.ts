@@ -1,4 +1,4 @@
-import { lemmaCardId } from '../db/schema'
+import { db, lemmaCardId } from '../db/schema'
 
 type Row = Record<string, unknown>
 export interface UpgradedExport { cards: Row[]; reviewLog: Row[]; userExamples: Row[]; userGlosses: Row[]; dropped: number }
@@ -50,4 +50,44 @@ export async function upgradeExport(
     return out
   }
   return { cards, reviewLog, userExamples: await fix(d.userExamples), userGlosses: await fix(d.userGlosses), dropped }
+}
+
+/**
+ * Rows in the pre-v4 shape (numeric lemma id) can still arrive from the server, pushed by a device that had not been
+ * upgraded yet. Convert them to stable keys through the lemmas of the local bundle (right while it is the same build
+ * they were made with) and tombstone the old rows so the deletion syncs. Idempotent; does nothing until the dictionary is loaded.
+ */
+export async function repairLegacyRows(): Promise<number> {
+  if (!(await db.lemmas.count())) return 0
+  const now = Date.now()
+  const keyOf = async (id: unknown) => (typeof id === 'number' ? (await db.lemmas.get(id))?.key : undefined)
+  let fixed = 0
+  await db.transaction('rw', [db.lemmas, db.cards, db.reviewLog, db.userExamples, db.userGlosses], async () => {
+    for (const c of await db.cards.filter(x => !x.deleted && x.lemmaKey == null && x.entryId == null).toArray()) {
+      const key = await keyOf((c as unknown as { lemmaId?: number }).lemmaId ?? legacyLemmaId(c.id))
+      if (!key) continue
+      const { lemmaId: _drop, ...rest } = c as unknown as Row
+      void _drop
+      const id = lemmaCardId(key)
+      const cur = await db.cards.get(id)
+      if (!cur || cur.deleted || Number(cur.updatedAt) < Number(c.updatedAt)) await db.cards.put({ ...rest, id, lemmaKey: key, updatedAt: now } as never)
+      await db.cards.put({ ...c, deleted: 1, updatedAt: now })
+      fixed++
+    }
+    for (const l of await db.reviewLog.filter(x => !x.deleted && typeof x.cardId === 'string' && LEGACY_ID.test(x.cardId)).toArray()) {
+      const key = await keyOf(legacyLemmaId(l.cardId))
+      if (key) { await db.reviewLog.put({ ...l, cardId: lemmaCardId(key), updatedAt: now }); fixed++ }
+    }
+    for (const t of [db.userExamples, db.userGlosses] as unknown as { filter(f: (r: Row) => boolean): { toArray(): Promise<Row[]> }; put(r: Row): Promise<unknown> }[]) {
+      for (const r of await t.filter(x => !x.deleted && x.lemmaKey === undefined && x.lemmaId != null).toArray()) {
+        const key = await keyOf(r.lemmaId)
+        if (!key) continue
+        const { lemmaId: _d, ...rest } = r
+        void _d
+        await t.put({ ...rest, lemmaKey: key, updatedAt: now })
+        fixed++
+      }
+    }
+  })
+  return fixed
 }

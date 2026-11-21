@@ -37,6 +37,15 @@ signing in on desktop). Items are ordered by priority. "Needs owner" = requires 
 14. More example sources for rare forms (e.g. `cercherebbe` has none); optional AI-generated example sentences (clearly marked).
 15. Real-device test of the whole flow: phone sign-in (needs the hosted https URL; LAN http test needs the LAN URL in Supabase redirect list).
 
+## Owner feedback after first real use (2026-11-21), to triage
+A. **First load is slow and boring** (34 MB download + import). Ideas: gzip/brotli the bundle (~6 MB over the wire; Pages may already compress it, verify), split into core (lemmas + forms) and lazy examples, show what is happening and let search work as soon as the core is in, or an "importing, you can already review" state.
+B. **Search box: show recent searches on focus.** Store the last ~10 looked-up words locally (synced setting is optional).
+C. **Italian grammar labels** instead of English ("congiuntivo imperfetto", not "imperfect subjunctive"), and beginner-friendly persons: "(voi)" instead of "2nd pl". Applies to `lib/tags.ts` and everywhere forms are labelled.
+D. **Conjugation table on verb pages** (like Reverso / Wiktionary): mood/tense grid with the pronouns, built from the `forms` tags. Probably a collapsible section per mood.
+E. **Some words show only 1 example** (the bundle keeps up to 25 per lemma, but rare words simply have few Tatoeba sentences). Options: lower the per-lemma pruning, a second lazily loaded sentence file, more sources (backlog 10), or clearly marked AI-generated examples (backlog 14).
+F. **Review card: drop the small grammar line under the translation** (e.g. "masculine plural") when the example's form differs from the lemma.
+G. **Badge showed 1 but Review was empty** (FIXED 2026-11-21): a card pushed by the pre-migration build reached the hosted site in the old shape. Rows in the old shape are now repaired after each pull and ignored by the queue.
+
 ## Done (reference)
 Stable card keys (cards, user glosses and examples keyed by `lemma|pos`, Dexie v4 migration + legacy-export import, tested), scaffold, offline bundle pipeline (20.5k lemmas), master pages with form filters, FSRS review (random example, Show answer / I know it, Details,
 Mark as known, undo, visible next review, Stats), Reverso CSV import (words + phrases), dynamic "Did you mean", search autocomplete, Google auth + sync

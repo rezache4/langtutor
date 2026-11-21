@@ -41,7 +41,11 @@ export interface Meta { get(key: string): string | null; set(key: string, value:
 export type SyncTables = Record<TblName, Table<any, any>>
 
 export interface SyncResult { pulled: number; pushed: number }
-export interface SyncOptions { pageSize?: number; batchSize?: number; rewindMs?: number }
+export interface SyncOptions {
+  pageSize?: number; batchSize?: number; rewindMs?: number
+  /** Runs after the pull and before the push, so rows it rewrites are pushed in the same cycle. */
+  afterPull?: () => Promise<void>
+}
 
 const EPOCH: Cursor = { at: '1970-01-01T00:00:00.000Z', tbl: '', id: '' }
 const pkOf = (t: (typeof SYNC_TABLES)[number], row: Record<string, unknown>) => String(row[t.pk])
@@ -108,6 +112,8 @@ export async function syncOnce(tables: SyncTables, remote: Remote, meta: Meta, o
     }
     if (page.length < pageSize) break
   }
+
+  await opts.afterPull?.()
 
   // ---- Push. Local cursor per table over updatedAt, inclusive, plus the ids already known to the remote
   // at exactly the cursor's millisecond (so same-ms writes are neither missed nor re-sent).

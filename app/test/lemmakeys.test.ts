@@ -96,3 +96,31 @@ describe('upgradeExport (pre-v4 backup files)', () => {
     expect(up.dropped).toBe(0)
   })
 })
+
+describe('repairLegacyRows (pre-v4 rows pulled from the server)', () => {
+  it('converts them, tombstones the old rows, ignores unresolvable ones and is idempotent', async () => {
+    const { db } = await import('../src/db/schema')
+    const { repairLegacyRows } = await import('../src/lib/legacy')
+    const { isLive } = await import('../src/lib/cards')
+    await db.lemmas.bulkPut([{ id: 10, key: 'bere|verb', lemma: 'bere', pos: 'verb', glosses: ['to drink'] }])
+    await db.cards.bulkPut([
+      { id: 'l10', lemmaId: 10, due: 1, stability: 2, reps: 3, updatedAt: 5 },
+      { id: 'l777', lemmaId: 777, due: 1, stability: 2, reps: 3, updatedAt: 5 },
+    ] as never[])
+    await db.reviewLog.put({ id: 'rl', cardId: 'l10', rating: 3, reviewedAt: 1, updatedAt: 1 } as never)
+    await db.userGlosses.put({ id: 'gl', lemmaId: 10, text: 'drink', updatedAt: 1 } as never)
+
+    expect(isLive(await db.cards.get('l10'))).toBe(false) // malformed rows never count as cards
+    expect(await repairLegacyRows()).toBe(3)
+
+    const moved = (await db.cards.get('l:bere|verb'))!
+    expect(moved).toMatchObject({ lemmaKey: 'bere|verb', reps: 3, stability: 2 })
+    expect('lemmaId' in moved).toBe(false)
+    expect(isLive(moved)).toBe(true)
+    expect((await db.cards.get('l10'))?.deleted).toBe(1)
+    expect((await db.cards.get('l777'))?.deleted).toBeUndefined() // lemma unknown: left alone (and not live)
+    expect((await db.reviewLog.get('rl'))?.cardId).toBe('l:bere|verb')
+    expect(await db.userGlosses.get('gl')).toMatchObject({ lemmaKey: 'bere|verb' })
+    expect(await repairLegacyRows()).toBe(0)
+  })
+})

@@ -10,7 +10,7 @@ import { loadBundle, type Progress } from './data/loader'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useSettings } from './lib/settings'
 import { availableCount } from './lib/queue'
-import { startSync, syncSoon } from './lib/sync'
+import { startSync, syncNow, syncSoon } from './lib/sync'
 
 const tabs = [
   { to: '/', label: 'Search', icon: '\u{1F50D}' },
@@ -24,7 +24,7 @@ export default function App() {
   const [prog, setProg] = useState<Progress | null>(null)
   useEffect(() => {
     let on = true
-    loadBundle(p => { if (on) setProg(p) }).catch(() => { /* offline or no bundle */ }).finally(() => { if (on) setReady(true) })
+    loadBundle(p => { if (on) setProg(p) }).catch(() => { /* offline or no bundle */ }).finally(() => { void syncNow(); if (on) setReady(true) }) // a sync that ran before the dictionary was loaded could not repair old rows
     return () => { on = false }
   }, [])
   useEffect(() => { startSync() }, [])

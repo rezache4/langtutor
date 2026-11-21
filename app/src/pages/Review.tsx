@@ -8,7 +8,7 @@ import { buildQueue } from '../lib/queue'
 import { fmtInterval, relDue, nextReviewText } from '../lib/time'
 import { groupForms, labelsOf } from '../lib/tags'
 import { CLAMP_LEN, ExLine, Speak } from '../lib/ui'
-import { isActive, putCard } from '../lib/cards'
+import { isActive, isLive, putCard } from '../lib/cards'
 import { entryExamples, lemmaExamples, mergeGlosses, userGlossTexts } from '../lib/userdata'
 
 const LABEL: Record<number, string> = { 1: 'Again', 2: 'Hard', 3: 'Good', 4: 'Easy' }
@@ -150,7 +150,7 @@ export default function Review() {
   useEffect(() => {
     if (!done) return
     void db.cards.where('due').above(Date.now()).filter(isActive).first().then(c => setNextDue(c ? c.due : null))
-    void db.cards.filter(c => !c.deleted).count().then(setDeckSize)
+    void db.cards.filter(isLive).count().then(setDeckSize)
   }, [done, S?.gen])
 
   const ok = !!S && !!cur && cur.gen === S.gen && !done

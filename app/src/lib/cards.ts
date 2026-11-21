@@ -5,8 +5,8 @@ export { entryCardId, lemmaCardId }
 export type CardRef = { lemmaKey: string } | { entryId: string }
 export const cardIdOf = (r: CardRef) => ('lemmaKey' in r ? lemmaCardId(r.lemmaKey) : entryCardId(r.entryId))
 
-/** A card that exists (not soft-deleted). */
-export const isLive = (c: CardRow | undefined | null): c is CardRow => !!c && !c.deleted
+/** A card that exists: not soft-deleted and pointing at a lemma or an entry (rows in the pre-v4 shape are not usable yet). */
+export const isLive = (c: CardRow | undefined | null): c is CardRow => !!c && !c.deleted && (c.lemmaKey != null || c.entryId != null)
 /** A card that can be scheduled: live and not marked as known. */
 export const isActive = (c: CardRow | undefined | null): c is CardRow => isLive(c) && !c.suspended
 

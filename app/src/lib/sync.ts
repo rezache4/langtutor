@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import { db } from '../db/schema'
+import { repairLegacyRows } from './legacy'
 import { supabase } from './supabase'
 import { getSession } from './auth'
 import { syncOnce, SYNC_TABLES, type Cursor, type DocRow, type Meta, type Remote, type SyncTables } from './syncCore'
@@ -50,7 +51,7 @@ export function syncNow(): Promise<void> {
       if (!session) { setStatus({ state: 'signedout', error: null }); return }
       if (typeof navigator !== 'undefined' && navigator.onLine === false) { setStatus({ state: 'offline' }); return }
       setStatus({ state: 'syncing', error: null })
-      const r = await syncOnce(tables, remoteFor(), metaFor(session.user.id))
+      const r = await syncOnce(tables, remoteFor(), metaFor(session.user.id), { afterPull: async () => { await repairLegacyRows() } })
       const now = Date.now()
       ls.set('lastSync', String(now))
       setStatus({ state: 'idle', lastSync: now, error: null, pulled: r.pulled, pushed: r.pushed })
