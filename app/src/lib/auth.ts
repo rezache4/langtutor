@@ -5,7 +5,7 @@ import { supabase } from './supabase'
 /** Optional Google sign-in. The app works fully signed-out; signing in only turns sync on. */
 export async function signInWithGoogle(): Promise<string | null> {
   if (!supabase) return 'Sync is not configured'
-  const { error } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } })
+  const { error } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin + import.meta.env.BASE_URL.replace(/\/$/, '') } })
   return error?.message ?? null
 }
 
