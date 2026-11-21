@@ -1,4 +1,4 @@
-import { db, type Ex, type Example, type UserEntry, type UserGloss } from '../db/schema'
+import { db, type Ex, type Example, type Lemma, type UserEntry, type UserGloss } from '../db/schema'
 import { esc } from './ui'
 
 export const norm = (s: string) => s.normalize('NFC').toLowerCase().replace(/[’‘]/g, "'").replace(/\s+/g, ' ').trim()
@@ -11,16 +11,16 @@ export function mergeGlosses(dict: string[], user: string[]): { dict: string[]; 
   return { dict, user: u }
 }
 
-export async function userGlossTexts(lemmaId: number): Promise<string[]> {
-  const rows = await db.userGlosses.where('lemmaId').equals(lemmaId).filter((g: UserGloss) => !g.deleted).toArray()
+export async function userGlossTexts(lemmaKey: string): Promise<string[]> {
+  const rows = await db.userGlosses.where('lemmaKey').equals(lemmaKey).filter((g: UserGloss) => !g.deleted).toArray()
   return rows.map(r => r.text)
 }
 
 /** Tatoeba examples of a lemma plus the user's own for it. */
-export async function lemmaExamples(lemmaId: number): Promise<Ex[]> {
+export async function lemmaExamples(l: Pick<Lemma, 'id' | 'key'>): Promise<Ex[]> {
   const [tat, mine] = await Promise.all([
-    db.examples.where('lemmaId').equals(lemmaId).toArray(),
-    db.userExamples.where('lemmaId').equals(lemmaId).filter(e => !e.deleted).toArray(),
+    db.examples.where('lemmaId').equals(l.id).toArray(),
+    db.userExamples.where('lemmaKey').equals(l.key).filter(e => !e.deleted).toArray(),
   ])
   return [...mine.map(e => ({ id: e.id, form: e.form, it: e.it, en: e.en, user: true })), ...tat]
 }

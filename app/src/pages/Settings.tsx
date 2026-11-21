@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { db, setSetting } from '../db/schema'
 import { DEFAULTS, useSettings } from '../lib/settings'
 import AccountCard from './AccountCard'
+import { upgradeExport } from '../lib/legacy'
 import { importReverso, type ImportSummary } from '../lib/reverso'
 
 const opts = (list: number[], cur: number) => (list.includes(cur) ? list : [...list, cur].sort((a, b) => a - b))
@@ -37,20 +38,19 @@ export default function Settings() {
       if (d.app !== 'langtutor' || !Array.isArray(d.cards) || !Array.isArray(d.reviewLog) || !Array.isArray(d.settings))
         throw new Error('Not a LangTutor export')
       const now = Date.now()
-      // Older exports: numeric card ids and no updatedAt.
-      const cardId = (x: unknown) => (typeof x === 'number' ? `l${x}` : x)
-      const cards = d.cards.map((c: Record<string, unknown>) => ({ ...c, id: cardId(c.id), lemmaId: c.lemmaId ?? (typeof c.id === 'number' ? c.id : undefined), updatedAt: c.updatedAt ?? now }))
-      const logs = d.reviewLog.map((l: Record<string, unknown>) => ({ ...l, cardId: cardId(l.cardId), updatedAt: l.updatedAt ?? l.reviewedAt ?? now }))
+      // Older exports refer to lemmas by build-local numeric id: resolve them through the current dictionary.
+      const up = await upgradeExport(d, async id => (await db.lemmas.get(id))?.key, now)
+      const cards = up.cards, logs = up.reviewLog
       const sets = d.settings.map((x: Record<string, unknown>) => ({ ...x, updatedAt: x.updatedAt ?? now }))
       await db.transaction('rw', [db.cards, db.reviewLog, db.settings, db.userEntries, db.userExamples, db.userGlosses], async () => {
-        await db.cards.bulkPut(cards)
-        await db.reviewLog.bulkPut(logs)
+        await db.cards.bulkPut(cards as never[])
+        await db.reviewLog.bulkPut(logs as never[])
         await db.settings.bulkPut(sets)
         await db.userEntries.bulkPut(d.userEntries ?? [])
-        await db.userExamples.bulkPut(d.userExamples ?? [])
-        await db.userGlosses.bulkPut(d.userGlosses ?? [])
+        await db.userExamples.bulkPut(up.userExamples as never[])
+        await db.userGlosses.bulkPut(up.userGlosses as never[])
       })
-      setMsg(`Imported ${d.cards.length} cards, ${d.reviewLog.length} reviews.`)
+      setMsg(`Imported ${cards.length} cards, ${logs.length} reviews.` + (up.dropped ? ` Skipped ${up.dropped} that no longer match the dictionary.` : ''))
     } catch (e) {
       setMsg('Import failed: ' + (e as Error).message)
     }

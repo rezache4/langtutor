@@ -148,9 +148,9 @@ export default function Search() {
             <strong>{l.lemma}</strong> <span className="tag">{l.pos}</span>
             <div className="muted">{l.glosses.slice(0, 3).join('; ')}</div>
           </button>
-          {inDeck?.has(lemmaCardId(l.id))
+          {inDeck?.has(lemmaCardId(l.key))
             ? <span className="muted choice-add">✓ In review</span>
-            : <button className="choice-add" onClick={() => addCard({ lemmaId: l.id })}>+ Add</button>}
+            : <button className="choice-add" onClick={() => addCard({ lemmaKey: l.key })}>+ Add</button>}
         </div>
       ))}
       {entries.length > 0 && <h2>Your words and phrases</h2>}

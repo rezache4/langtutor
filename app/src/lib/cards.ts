@@ -1,11 +1,9 @@
-import { db, type CardRow, type UserEntry } from '../db/schema'
+import { db, entryCardId, lemmaCardId, type CardRow, type UserEntry } from '../db/schema'
 import { newCard } from './fsrs'
 
-/** Card ids are stable keys: the same lemma yields the same id on every device. */
-export const lemmaCardId = (lemmaId: number) => `l${lemmaId}`
-export const entryCardId = (entryId: string) => `e${entryId}`
-export type CardRef = { lemmaId: number } | { entryId: string }
-export const cardIdOf = (r: CardRef) => ('lemmaId' in r ? lemmaCardId(r.lemmaId) : entryCardId(r.entryId))
+export { entryCardId, lemmaCardId }
+export type CardRef = { lemmaKey: string } | { entryId: string }
+export const cardIdOf = (r: CardRef) => ('lemmaKey' in r ? lemmaCardId(r.lemmaKey) : entryCardId(r.entryId))
 
 /** A card that exists (not soft-deleted). */
 export const isLive = (c: CardRow | undefined | null): c is CardRow => !!c && !c.deleted

@@ -1,5 +1,5 @@
 import { db, type CardRow, type EntryPool, type UserEntry, type UserExample, type UserGloss } from '../db/schema'
-import { isLive } from './cards'
+import { isLive, lemmaCardId } from './cards'
 import { newCard } from './fsrs'
 import { rankForm } from './lookup'
 import { loadCorpus, norm, searchCorpus, type Corpus } from './userdata'
@@ -62,7 +62,7 @@ export async function importReverso(text: string, progress: (done: number, total
 
   const now = Date.now()
   const entries: UserEntry[] = [], examples: UserExample[] = [], glosses: UserGloss[] = [], cards: CardRow[] = [], pools: EntryPool[] = []
-  const lemmaCards = new Map<number, boolean>() // lemma id -> a live card exists (or is being created)
+  const lemmaCards = new Map<string, boolean>() // lemma key -> a live card exists (or is being created)
   let corpus: Corpus | undefined
 
   for (let n = 0; n < data.length; n++) {
@@ -83,16 +83,16 @@ export async function importReverso(text: string, progress: (done: number, total
 
     const ranked = WORD.test(source) ? await rankForm(key) : []
     if (ranked.length) {
-      const lemmaId = ranked[0].l.id
-      for (const text of gl) glosses.push({ id: crypto.randomUUID(), lemmaId, text, source: 'reverso', src: key, updatedAt: now })
-      if (itEx) examples.push({ id: crypto.randomUUID(), lemmaId, phraseId: null, form: key, it: itEx, en: enEx, source: 'reverso', src: key, updatedAt: now })
-      if (!lemmaCards.has(lemmaId)) lemmaCards.set(lemmaId, isLive(await db.cards.get(`l${lemmaId}`)))
-      if (!lemmaCards.get(lemmaId)) { cards.push(newCard({ lemmaId })); lemmaCards.set(lemmaId, true); sum.newCards++ }
+      const lemmaKey = ranked[0].l.key
+      for (const text of gl) glosses.push({ id: crypto.randomUUID(), lemmaKey, text, source: 'reverso', src: key, updatedAt: now })
+      if (itEx) examples.push({ id: crypto.randomUUID(), lemmaKey, phraseId: null, form: key, it: itEx, en: enEx, source: 'reverso', src: key, updatedAt: now })
+      if (!lemmaCards.has(lemmaKey)) lemmaCards.set(lemmaKey, isLive(await db.cards.get(lemmaCardId(lemmaKey))))
+      if (!lemmaCards.get(lemmaKey)) { cards.push(newCard({ lemmaKey })); lemmaCards.set(lemmaKey, true); sum.newCards++ }
       sum.linked++
     } else {
       const entry: UserEntry = { id: crypto.randomUUID(), text: source, kind: WORD.test(source) ? 'word' : 'phrase', glosses: gl, updatedAt: now }
       entries.push(entry)
-      if (itEx) examples.push({ id: crypto.randomUUID(), lemmaId: null, phraseId: entry.id, form: source, it: itEx, en: enEx, source: 'reverso', src: key, updatedAt: now })
+      if (itEx) examples.push({ id: crypto.randomUUID(), lemmaKey: null, phraseId: entry.id, form: source, it: itEx, en: enEx, source: 'reverso', src: key, updatedAt: now })
       cards.push(newCard({ entryId: entry.id }))
       corpus ??= await loadCorpus()
       pools.push({ entryId: entry.id, examples: searchCorpus(corpus, source), computedAt: now })

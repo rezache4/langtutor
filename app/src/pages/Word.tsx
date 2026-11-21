@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams, useLocation, useSearchParams } from 'reac
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type Ex } from '../db/schema'
 import { ExLine, Speak } from '../lib/ui'
-import { isLive } from '../lib/cards'
+import { isLive, lemmaCardId } from '../lib/cards'
 import { CardControls } from '../lib/CardControls'
 import { formLabel, rankForm, wordUrl } from '../lib/lookup'
 import { lemmaExamples, mergeGlosses, userGlossTexts } from '../lib/userdata'
@@ -30,11 +30,11 @@ export default function Word() {
     let l = id ? await db.lemmas.get(id) : undefined
     if (!l || l.lemma !== lemma) l = await db.lemmas.where('lemma').equals(lemma).first()
     if (!l) return null
-    const examples = await lemmaExamples(l.id)
+    const examples = await lemmaExamples(l)
     const forms = await db.formIndex.where('lemmaId').equals(l.id).toArray()
-    const c = await db.cards.get(`l${l.id}`)
+    const c = await db.cards.get(lemmaCardId(l.key))
     const card = isLive(c) ? c : null
-    const gl = mergeGlosses(l.glosses, await userGlossTexts(l.id))
+    const gl = mergeGlosses(l.glosses, await userGlossTexts(l.key))
     // Did you mean: other lemmas the SEARCHED form itself maps to (never the lemma's other forms).
     const others = hl && !locState?.fromReview ? (await rankForm(hl)).filter(r => r.l.id !== l.id) : []
     return { l, examples, forms, card, gl, others }
@@ -86,7 +86,7 @@ export default function Word() {
           )
         })}?</p>
       )}
-      <CardControls cardRef={{ lemmaId: l.id }} card={card} />
+      <CardControls cardRef={{ lemmaKey: l.key }} card={card} />
       <h2>Examples ({shown.length})</h2>
       {grouped.length > 0 && (
         <div className="filter">

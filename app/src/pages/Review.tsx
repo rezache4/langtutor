@@ -73,12 +73,12 @@ async function loadCur(S: Session, s: AppSettings): Promise<Cur | 'gone'> {
   const card = await db.cards.get(S.queue[S.idx])
   if (!isActive(card)) return 'gone' // deleted, suspended or missing meanwhile
   let title: string, pos: string | undefined, glosses: Cur['glosses'], examples: Ex[], forms: Form[] = [], to: string
-  if (card.lemmaId != null) {
-    const lemma = await db.lemmas.get(card.lemmaId)
+  if (card.lemmaKey != null) {
+    const lemma = await db.lemmas.where('key').equals(card.lemmaKey).first()
     if (!lemma) return 'gone'
     title = lemma.lemma; pos = lemma.pos
-    glosses = mergeGlosses(lemma.glosses, await userGlossTexts(lemma.id))
-    examples = await lemmaExamples(lemma.id)
+    glosses = mergeGlosses(lemma.glosses, await userGlossTexts(lemma.key))
+    examples = await lemmaExamples(lemma)
     forms = await db.formIndex.where('lemmaId').equals(lemma.id).toArray()
     to = `/word/${encodeURIComponent(lemma.lemma)}?id=${lemma.id}`
   } else {
@@ -289,7 +289,7 @@ export default function Review() {
   const backGlosses = [...cur.glosses.dict.slice(0, 3), ...cur.glosses.user.slice(0, 3)]
   const detailsOpen = S.phase === 'reveal' && (S.open || S.again)
   const groups = detailsOpen ? groupForms(cur.forms) : []
-  const isLemma = card.lemmaId != null
+  const isLemma = card.lemmaKey != null
 
   return (
     <>

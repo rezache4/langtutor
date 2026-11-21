@@ -4,9 +4,6 @@ Status 2026-11-17: core app works (search + autocomplete, word pages, FSRS revie
 signing in on desktop). Items are ordered by priority. "Needs owner" = requires the project owner's action or answer.
 
 ## P0: before sharing with anyone
-1. **Stable card keys.** Cards use `l<lemmaId>` and lemma ids shift on every pipeline rebuild, which would corrupt cards synced between devices
-   on different bundle versions. Key cards by `lemma|pos` (and `entry:<uuid>` for user entries), migrate existing cards (Dexie v4), and make the
-   pipeline emit stable string ids or keep an id map. Add tests.
 2. **Public repo + deploy (needs owner).** Old private repo `rezache4/langtutor` still holds pre-rewrite commits (old author name, personal word list).
    Owner must delete it (or run `gh auth refresh -h github.com -s delete_repo`), then: create public `langtutor`, push clean history, re-add secrets
    `SUPABASE_URL` / `SUPABASE_KEY` (see `.env` in `app/`), confirm the keep-alive workflow runs.
@@ -41,6 +38,6 @@ signing in on desktop). Items are ordered by priority. "Needs owner" = requires 
 15. Real-device test of the whole flow: phone sign-in (needs the hosted https URL; LAN http test needs the LAN URL in Supabase redirect list).
 
 ## Done (reference)
-Scaffold, offline bundle pipeline (20.5k lemmas), master pages with form filters, FSRS review (random example, Show answer / I know it, Details,
+Stable card keys (cards, user glosses and examples keyed by `lemma|pos`, Dexie v4 migration + legacy-export import, tested), scaffold, offline bundle pipeline (20.5k lemmas), master pages with form filters, FSRS review (random example, Show answer / I know it, Details,
 Mark as known, undo, visible next review, Stats), Reverso CSV import (words + phrases), dynamic "Did you mean", search autocomplete, Google auth + sync
 with RLS and offline tests, keep-alive workflow, SETUP guide.

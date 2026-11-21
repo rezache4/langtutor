@@ -1,6 +1,6 @@
-import { db, getSetting, setSetting, type Example, type Form, type Lemma } from '../db/schema'
+import { db, getSetting, setSetting, lemmaKeyOf, type Example, type Form, type Lemma } from '../db/schema'
 
-export interface Bundle { version: string | number; lemmas: Lemma[]; forms: Form[]; examples: Example[] }
+export interface Bundle { version: string | number; lemmas: Omit<Lemma, 'key'>[]; forms: Form[]; examples: Example[] }
 export interface Progress { phase: 'download' | 'import'; pct: number }
 
 const CHUNK = 5000
@@ -76,7 +76,7 @@ export async function loadBundle(onProgress: (p: Progress) => void = () => {}): 
   await db.formIndex.clear()
   await db.lemmas.clear()
   await db.examples.clear()
-  await putChunks(db.lemmas, b.lemmas, done, total, onProgress)
+  await putChunks(db.lemmas, b.lemmas.map(l => ({ ...l, key: lemmaKeyOf(l.lemma, l.pos) })), done, total, onProgress)
   await putChunks(db.formIndex, b.forms, done, total, onProgress)
   await putChunks(db.examples, b.examples, done, total, onProgress)
   await setSetting('bundleSig', sig)

@@ -1,5 +1,5 @@
 import { createEmptyCard, fsrs, Rating, type Card, type Grade, type State } from 'ts-fsrs'
-import type { CardRow } from '../db/schema'
+import { entryCardId, lemmaCardId, type CardRow } from '../db/schema'
 
 export { Rating }
 export type { Grade }
@@ -12,8 +12,8 @@ function scheduler(retention: number) {
   return s
 }
 
-export function newCard(ref: { lemmaId: number } | { entryId: string }, now = new Date()): CardRow {
-  const base = 'lemmaId' in ref ? { id: `l${ref.lemmaId}`, lemmaId: ref.lemmaId } : { id: `e${ref.entryId}`, entryId: ref.entryId }
+export function newCard(ref: { lemmaKey: string } | { entryId: string }, now = new Date()): CardRow {
+  const base = 'lemmaKey' in ref ? { id: lemmaCardId(ref.lemmaKey), lemmaKey: ref.lemmaKey } : { id: entryCardId(ref.entryId), entryId: ref.entryId }
   return toRow({ ...base, updatedAt: now.getTime() }, createEmptyCard(now))
 }
 
@@ -29,10 +29,10 @@ export function schedule(row: CardRow, rating: Grade, now = new Date(), retentio
   return preview(row, now, retention)[rating]
 }
 
-/** Identity (id, lemmaId/entryId, suspended...) comes from `base`; scheduling fields from the ts-fsrs card. */
-function toRow(base: Pick<CardRow, 'id' | 'lemmaId' | 'entryId' | 'updatedAt' | 'suspended'>, c: Card): CardRow {
+/** Identity (id, lemmaKey/entryId, suspended...) comes from `base`; scheduling fields from the ts-fsrs card. */
+function toRow(base: Pick<CardRow, 'id' | 'lemmaKey' | 'entryId' | 'updatedAt' | 'suspended'>, c: Card): CardRow {
   return {
-    id: base.id, lemmaId: base.lemmaId, entryId: base.entryId, updatedAt: base.updatedAt, suspended: base.suspended,
+    id: base.id, lemmaKey: base.lemmaKey, entryId: base.entryId, updatedAt: base.updatedAt, suspended: base.suspended,
     due: c.due.getTime(),
     stability: c.stability, difficulty: c.difficulty,
     scheduled_days: c.scheduled_days,

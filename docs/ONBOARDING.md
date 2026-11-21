@@ -41,7 +41,7 @@ Dictionary bundle is not in git (`app/public/data/bundle.json` is ignored): buil
 
 ## Gotchas
 - Dev machine is Windows; the Bash tool is Git Bash: use forward slashes in paths (`cd C:/Users/...`).
-- Lemma ids in the bundle are sequential ints and change whenever the pipeline output changes; cards are currently keyed `l<lemmaId>` (see BACKLOG P0).
+- Lemma ids in the bundle are sequential ints and change whenever the pipeline output changes; user data must never store them. Cards, user glosses and user examples refer to a lemma by its stable `key` (`lemma|pos`, derived in the loader; card id `l:<key>`), so data survives bundle rebuilds and syncs between devices.
 - ts-fsrs v6 has no `elapsed_days`. Settings keys `bundleVersion`, `bundleSig`, `deviceId` are device-local (not synced).
 - Never commit `.env`, the dictionary bundle, or personal word lists. Commit as the project identity configured in repo-local git config.
 - Data credits (Tatoeba, Wiktionary/kaikki) must stay visible in Settings > About; the bundle is CC BY-SA.
