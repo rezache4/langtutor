@@ -110,3 +110,23 @@ button.ac-row:hover, button.ac-row.active { background: color-mix(in srgb, var(-
 /* Long example clamp */
 .clamp3 { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
 .clamp-more { display: inline-flex; align-items: center; gap: 4px; }
+
+/* Conjugation table (verb pages) */
+.conj h3 { margin: 14px 0 0; font-size: 1rem; }
+.conj-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0 10px; }
+.conj-block { padding: 10px 12px; margin: 8px 0; }
+.conj-title { display: block; margin-bottom: 4px; }
+.conj-row { display: flex; gap: 8px; line-height: 1.7; }
+.conj-pron { flex: 0 0 4.2em; color: var(--muted); font-size: .9rem; }
+.conj-hit { background: color-mix(in srgb, var(--accent) 30%, transparent); border-radius: 4px; padding: 0 3px; }
+
+/* Recent searches */
+.recent { margin: 8px 0; }
+.recent-head { display: flex; justify-content: space-between; align-items: center; }
+
+/* Loading */
+.tip { max-width: 28rem; color: var(--muted); font-size: .95rem; min-height: 3em; }
+.ex-banner { padding: 10px 12px; margin: 0 0 12px; }
+.ex-banner .bar { width: 100%; margin-top: 6px; }
+.conj-block.wide { grid-column: 1 / -1; }
+.conj-block.wide .conj-pron { flex-basis: 10em; }

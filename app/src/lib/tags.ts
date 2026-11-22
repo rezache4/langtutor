@@ -1,53 +1,71 @@
-// Compact tag codes from the pipeline ("ind.pres.1s", "cond.3s", "ptcp.past", "ger", "inf", "f.pl").
-export type TagGroup = 'Present' | 'Past' | 'Imperfect' | 'Future' | 'Conditional' | 'Subjunctive' | 'Imperative' | 'Non-finite' | 'Other'
-export const GROUPS: TagGroup[] = ['Present', 'Past', 'Imperfect', 'Future', 'Conditional', 'Subjunctive', 'Imperative', 'Non-finite', 'Other']
+// Compact tag codes from the pipeline ("ind.pres.1s", "cond.3s", "ptcp.past.m.p", "ger", "inf", "f.p") shown with the
+// Italian grammar terms a learner meets in textbooks, and the pronouns instead of "1st/2nd/3rd person" labels.
 
-const PERSON: Record<string, string> = {
-  '1s': '1st person singular', '2s': '2nd person singular', '3s': '3rd person singular',
-  '1p': '1st person plural', '2p': '2nd person plural', '3p': '3rd person plural',
+export type TagGroup = 'Presente' | 'Passato remoto' | 'Imperfetto' | 'Futuro' | 'Condizionale' | 'Congiuntivo' | 'Imperativo' | 'Modi indefiniti' | 'Forme'
+export const GROUPS: TagGroup[] = ['Presente', 'Passato remoto', 'Imperfetto', 'Futuro', 'Condizionale', 'Congiuntivo', 'Imperativo', 'Modi indefiniti', 'Forme']
+
+/** Persons as the pronoun a beginner knows ("voi", not "2nd person plural"). */
+export const PRONOUN: Record<string, string> = { '1s': 'io', '2s': 'tu', '3s': 'lui/lei', '1p': 'noi', '2p': 'voi', '3p': 'loro' }
+export const PERSONS = ['1s', '2s', '3s', '1p', '2p', '3p'] as const
+const TENSE: Record<string, string> = { pres: 'presente', impf: 'imperfetto', hist: 'passato remoto', fut: 'futuro' }
+const GENDER: Record<string, string> = { m: 'maschile', f: 'femminile' }
+const NUM: Record<string, string> = { s: 'singolare', p: 'plurale' }
+const EXTRA: Record<string, string> = { dim: 'diminutivo', sup: 'superlativo', aug: 'accrescitivo' }
+
+const POS: Record<string, string> = {
+  noun: 'sostantivo', adj: 'aggettivo', verb: 'verbo', adv: 'avverbio', intj: 'interiezione', num: 'numerale', pron: 'pronome',
+  conj: 'congiunzione', prep: 'preposizione', det: 'determinante', article: 'articolo', contraction: 'preposizione articolata',
+  particle: 'particella', word: 'parola', phrase: 'frase',
 }
-const SHORT: Record<string, string> = { '1s': '1st sg', '2s': '2nd sg', '3s': '3rd sg', '1p': '1st pl', '2p': '2nd pl', '3p': '3rd pl' }
-const TENSE: Record<string, string> = { pres: 'present', impf: 'imperfect', hist: 'past historic', fut: 'future' }
-const GENDER: Record<string, string> = { m: 'masculine', f: 'feminine' }
-const NUM: Record<string, string> = { s: 'singular', p: 'plural' }
+/** Italian name of a part of speech (unknown values are shown as they are). */
+export const posLabel = (pos: string): string => POS[pos] ?? pos
 
+const person = (p: string | undefined) => (p && PRONOUN[p] ? ` (${PRONOUN[p]})` : '')
+
+/** "gender number extras" for noun/adjective/participle codes: ["m","p"] -> "maschile plurale". */
+function nominal(parts: string[]): string | null {
+  const g = ['m', 'f'].filter(x => parts.includes(x)).map(x => GENDER[x]).join(' e ')
+  const n = parts.filter(x => NUM[x]).map(x => NUM[x]).join(' ')
+  const e = parts.filter(x => EXTRA[x]).map(x => EXTRA[x]).join(' ')
+  return [g, n, e].filter(Boolean).join(' ') || null
+}
+
+/** Italian label of one tag code, e.g. "congiuntivo imperfetto (voi)"; null for codes with nothing to say. */
 export function labelTag(code: string): string | null {
-  const p = code.trim().split('.')
-  const [h, ...r] = p
-  if (h === 'inf') return 'infinitive'
-  if (h === 'ger') return 'gerund'
+  const [h, ...r] = code.trim().split('.')
+  if (!h) return null
+  if (h === 'inf') return 'infinito'
+  if (h === 'ger') return 'gerundio'
   if (h === 'ptcp') {
-    const t = r[0] === 'pres' ? 'present participle' : 'past participle'
-    const ex = r.slice(1).map(x => GENDER[x] ?? NUM[x]).filter(Boolean)
-    return ex.length ? `${t} · ${ex.join(' ')}` : t
+    const t = r[0] === 'pres' ? 'participio presente' : 'participio passato'
+    const ex = nominal(r.slice(1))
+    return ex ? `${t} · ${ex}` : t
   }
-  if (h === 'cond') return SHORT[r[0]] ? `conditional · ${SHORT[r[0]]}` : 'conditional'
-  if (h === 'imp') return PERSON[r[0]] ? `imperative · ${SHORT[r[0]]}` : 'imperative'
+  if (h === 'cond') return `condizionale presente${person(r[0])}`
+  if (h === 'imp') return `imperativo${person(r[0])}`
   if (h === 'ind' || h === 'sub') {
     const t = TENSE[r[0]]
-    if (!t) return null
-    const per = PERSON[r[1]]
-    if (h === 'sub') return per ? `${per} · ${t} subjunctive` : `${t} subjunctive`
-    return per ? `${per} · ${t}` : t
+    const per = person(t ? r[1] : r[0])
+    if (h === 'sub') return `congiuntivo${t ? ' ' + t : ''}${per}`
+    return t ? `${t}${per}` : null
   }
-  const ex = p.map(x => GENDER[x] ?? NUM[x] ?? (x === 'dim' ? 'diminutive' : x === 'sup' ? 'superlative' : x === 'aug' ? 'augmentative' : '')).filter(Boolean)
-  return ex.length ? ex.join(' ') : null
+  return nominal(code.trim().split('.'))
 }
 
 export function groupOf(code: string): TagGroup {
   const [h, a] = code.trim().split('.')
-  if (h === 'inf' || h === 'ger' || h === 'ptcp') return 'Non-finite'
-  if (h === 'cond') return 'Conditional'
-  if (h === 'imp') return 'Imperative'
-  if (h === 'sub') return 'Subjunctive'
-  if (h === 'ind') return a === 'pres' ? 'Present' : a === 'impf' ? 'Imperfect' : a === 'fut' ? 'Future' : a === 'hist' ? 'Past' : 'Other'
-  return 'Other'
+  if (h === 'inf' || h === 'ger' || h === 'ptcp') return 'Modi indefiniti'
+  if (h === 'cond') return 'Condizionale'
+  if (h === 'imp') return 'Imperativo'
+  if (h === 'sub') return 'Congiuntivo'
+  if (h === 'ind') return a === 'pres' ? 'Presente' : a === 'impf' ? 'Imperfetto' : a === 'fut' ? 'Futuro' : a === 'hist' ? 'Passato remoto' : 'Forme'
+  return 'Forme'
 }
 
 export const codesOf = (tags: string | string[] | undefined): string[] =>
   (Array.isArray(tags) ? tags.join(' | ') : tags ?? '').split('|').map(s => s.trim()).filter(Boolean)
 
-/** Plain labels for a stored tag string; unknown codes are dropped. */
+/** Labels for a stored tag string; unknown codes are dropped. */
 export const labelsOf = (tags: string | string[] | undefined): string[] =>
   codesOf(tags).map(labelTag).filter((x): x is string => !!x)
 
@@ -55,41 +73,17 @@ export const labelsOf = (tags: string | string[] | undefined): string[] =>
 export function groupForms(forms: { form: string; tags: string }[]): [TagGroup, string[]][] {
   const g = new Map<TagGroup, Set<string>>()
   for (const f of forms) {
-    const code = codesOf(f.tags).find(x => labelsOf(x).length)
-    const grp = code ? groupOf(code) : 'Other'
+    const code = codesOf(f.tags).find(x => labelTag(x))
+    const grp = code ? groupOf(code) : 'Forme'
     if (!g.has(grp)) g.set(grp, new Set())
     g.get(grp)!.add(f.form)
   }
   return GROUPS.filter(x => g.has(x)).map(x => [x, [...g.get(x)!]] as [TagGroup, string[]])
 }
 
-const TENSE_PLAIN: Record<string, string> = { pres: 'present', impf: 'imperfect', hist: 'past historic', fut: 'future' }
+export const shortLabel = labelTag
 
-/** Short plain-English label for one tag code: "1st sg present", "plural", "past participle". */
-export function shortLabel(code: string): string | null {
-  const [h, ...r] = code.trim().split('.')
-  if (!h) return null
-  if (h === 'inf') return 'infinitive'
-  if (h === 'ger') return 'gerund'
-  if (h === 'ptcp') {
-    const t = r[0] === 'pres' ? 'present participle' : 'past participle'
-    const ex = r.slice(1).map(x => GENDER[x] ?? NUM[x]).filter(Boolean)
-    return ex.length ? `${t}, ${ex.join(' ')}` : t
-  }
-  if (h === 'cond') return SHORT[r[0]] ? `${SHORT[r[0]]} conditional` : 'conditional'
-  if (h === 'imp') return SHORT[r[0]] ? `${SHORT[r[0]]} imperative` : 'imperative'
-  if (h === 'ind' || h === 'sub') {
-    const t = TENSE_PLAIN[r[0]]
-    if (!t) return null
-    const per = SHORT[r[1]]
-    return [per, t, h === 'sub' ? 'subjunctive' : ''].filter(Boolean).join(' ')
-  }
-  const ex = code.trim().split('.').map(x => GENDER[x] ?? NUM[x] ?? (x === 'dim' ? 'diminutive' : x === 'sup' ? 'superlative' : x === 'aug' ? 'augmentative' : '')).filter(Boolean)
-  return ex.length ? ex.join(' ') : null
-}
-
-/** Plain labels (at most `max`) for a stored tag string; an empty tag set is the dictionary form. */
+/** Labels (at most `max`) for a stored tag string; an empty tag set is the dictionary form. */
 export function plainLabels(tags: string | undefined, max = 2): string[] {
-  const out = [...new Set(codesOf(tags).map(shortLabel).filter((x): x is string => !!x))]
-  return out.slice(0, max)
+  return [...new Set(codesOf(tags).map(labelTag).filter((x): x is string => !!x))].slice(0, max)
 }

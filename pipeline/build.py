@@ -471,6 +471,7 @@ def build():
     path = os.path.join(OUT, "bundle.json")
     with open(path, "w", encoding="utf-8") as f:
         json.dump(bundle, f, ensure_ascii=False, separators=(",", ":"))
+    split_bundle(bundle)
     with open(path, "rb") as f, gzip.open(path + ".gz", "wb", compresslevel=9) as g:
         while c := f.read(1 << 20):
             g.write(c)
@@ -481,9 +482,22 @@ def build():
     log(f"total build time {time.time() - t0:.0f}s")
 
 
+def split_bundle(bundle):
+    """core.json (lemmas + forms: enough to search and look words up) and examples.json (sentences, ~60% of the bytes).
+    The app loads core first so it is usable sooner and fetches the examples in the background. Same `version` in both."""
+    for name, keys in (("core.json", ("lemmas", "forms")), ("examples.json", ("examples",))):
+        part = {"version": bundle["version"], **{k: bundle[k] for k in keys}}
+        with open(os.path.join(OUT, name), "w", encoding="utf-8") as f:
+            json.dump(part, f, ensure_ascii=False, separators=(",", ":"))
+        log(f"{name} {os.path.getsize(os.path.join(OUT, name)) / 1e6:.1f} MB")
+
+
 if __name__ == "__main__":
     step = sys.argv[1] if len(sys.argv) > 1 else "all"
     if step in ("download", "all"):
         download()
     if step in ("build", "all"):
         build()
+    if step == "split":  # re-split an existing out/bundle.json without rebuilding
+        with open(os.path.join(OUT, "bundle.json"), encoding="utf-8") as f:
+            split_bundle(json.load(f))

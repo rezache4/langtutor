@@ -20,7 +20,7 @@ export const SYNC_TABLES = [
 export type TblName = (typeof SYNC_TABLES)[number]['name']
 
 /** Settings that describe this device / its local data bundle and must never leave it. */
-export const LOCAL_ONLY_SETTINGS: ReadonlySet<string> = new Set(['bundleVersion', 'bundleSig', 'deviceId'])
+export const LOCAL_ONLY_SETTINGS: ReadonlySet<string> = new Set(['bundleVersion', 'bundleSig', 'coreSig', 'examplesVersion', 'deviceId'])
 
 export interface DocRow {
   tbl: string

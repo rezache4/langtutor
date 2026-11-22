@@ -1,15 +1,16 @@
 # Deploying to GitHub Pages
 
 The app is published at `https://rezache4.github.io/langtutor/` by `.github/workflows/deploy-pages.yml` on every push to `master`
-that touches `app/`. The dictionary bundle (~34 MB) is not in git: the workflow downloads it from a release.
+that touches `app/`. The dictionary (`core.json` ~15 MB + `examples.json` ~19 MB) is not in git: the workflow downloads both from a release.
 
 ## One-time setup (owner)
 1. **Secrets** (repo Settings > Secrets and variables > Actions): `SUPABASE_URL` and `SUPABASE_KEY` (the publishable key). Both
    the keep-alive workflow and the deploy build use them (the build bakes them in as `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`).
 2. **Pages**: Settings > Pages > Source = "GitHub Actions".
 3. **Dictionary release**: build the bundle (`pipeline/`), then
-   `gh release create data-latest pipeline/out/bundle.json --title "Dictionary bundle" --notes "CC BY-SA 4.0, see README"`.
-   To update it later: `gh release upload data-latest pipeline/out/bundle.json --clobber`, then re-run the workflow.
+   `gh release create data-latest pipeline/out/core.json pipeline/out/examples.json --title "Dictionary" --notes "CC BY-SA 4.0, see README"`.
+   To update it later: `gh release upload data-latest pipeline/out/core.json pipeline/out/examples.json --clobber`, then re-run the workflow.
+   (`bundle.json`, the old single file, is no longer used; delete that asset with `gh release delete-asset data-latest bundle.json`.)
    Note: an optional local `keep_lemmas.txt` forces extra lemmas into the bundle; they appear as ordinary dictionary entries.
 4. **Supabase** (Authentication > URL Configuration): Site URL `https://rezache4.github.io/langtutor/`; add the same URL to Redirect URLs
    (keep the localhost entries for development).

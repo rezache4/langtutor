@@ -4,7 +4,8 @@ dist
 .env.local
 pipeline/raw
 pipeline/out
-app/public/data/bundle.json
+app/public/data/*.json
+!app/public/data/sample.json
 pipeline/keep_lemmas.txt
 __pycache__
 *.pyc

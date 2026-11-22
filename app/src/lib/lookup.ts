@@ -63,11 +63,11 @@ export async function rankForm(form: string): Promise<Ranked[]> {
 /** True when the top two candidates are indistinguishable by frequency (both 0): ask the user. */
 export const needsChooser = (r: Ranked[]) => r.length > 1 && (r[0].l.freq ?? 0) === 0 && (r[1].l.freq ?? 0) === 0
 
-/** "1st sg present" / "plural" for a form under a lemma; empty tags are the dictionary form. */
+/** "presente (io)" / "plurale" for a form under a lemma; empty tags are the dictionary form. */
 export function formLabel(r: Ranked, form: string): string {
   const labels = plainLabels(r.tags)
   if (labels.length) return labels.join(' / ')
-  return r.l.lemma === form ? 'dictionary form' : ''
+  return r.l.lemma === form ? 'forma base' : ''
 }
 
 export const wordUrl = (l: Lemma, form?: string) =>

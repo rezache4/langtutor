@@ -4,6 +4,7 @@ import { DEFAULTS, useSettings } from '../lib/settings'
 import AccountCard from './AccountCard'
 import { upgradeExport } from '../lib/legacy'
 import { importReverso, type ImportSummary } from '../lib/reverso'
+import { useExamplesStatus } from '../data/loader'
 
 const opts = (list: number[], cur: number) => (list.includes(cur) ? list : [...list, cur].sort((a, b) => a - b))
 
@@ -11,6 +12,7 @@ export default function Settings() {
   const st = useSettings() ?? DEFAULTS
   const file = useRef<HTMLInputElement>(null)
   const csv = useRef<HTMLInputElement>(null)
+  const examplesReady = useExamplesStatus().state === 'ready'
   const [msg, setMsg] = useState('')
   const [rv, setRv] = useState<{ busy?: string; err?: string; sum?: ImportSummary } | null>(null)
 
@@ -116,7 +118,8 @@ export default function Settings() {
       <div className="card" data-testid="reverso">
         <h2>Reverso favorites</h2>
         <div className="row">
-          <button onClick={() => csv.current?.click()} disabled={!!rv?.busy}>Import Reverso favorites (CSV)</button>
+          <button onClick={() => csv.current?.click()} disabled={!!rv?.busy || !examplesReady}>Import Reverso favorites (CSV)</button>
+          {!examplesReady && <p className="muted">Available once the example sentences have finished loading.</p>}
           <input ref={csv} type="file" accept=".csv,text/csv" hidden data-testid="reverso-file"
             onChange={e => { const f = e.target.files?.[0]; if (f) void doReverso(f); e.target.value = '' }} />
         </div>

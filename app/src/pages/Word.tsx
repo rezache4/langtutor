@@ -1,13 +1,15 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useLocation, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type Ex } from '../db/schema'
 import { ExLine, Speak } from '../lib/ui'
 import { isLive, lemmaCardId } from '../lib/cards'
 import { CardControls } from '../lib/CardControls'
+import { ConjugationTable } from '../lib/ConjugationTable'
+import { addRecentLemma } from '../lib/recent'
 import { formLabel, rankForm, wordUrl } from '../lib/lookup'
 import { lemmaExamples, mergeGlosses, userGlossTexts } from '../lib/userdata'
-import { GROUPS, codesOf, groupOf, labelsOf, type TagGroup } from '../lib/tags'
+import { GROUPS, codesOf, groupOf, labelTag, posLabel, type TagGroup } from '../lib/tags'
 
 function shuffle<T>(a: T[]): T[] {
   const r = a.slice()
@@ -41,6 +43,8 @@ export default function Word() {
   }, [lemma, id, hl, !!locState?.fromReview])
 
   const lemmaId = data?.l.id
+  const lemmaKey = data?.l.key
+  useEffect(() => { if (lemmaKey) void addRecentLemma({ key: lemmaKey }) }, [lemmaKey])
   const nEx = data?.examples.length
   const shuffled = useMemo<Ex[]>(() => {
     const s = shuffle(data?.examples ?? [])
@@ -57,8 +61,8 @@ export default function Word() {
     for (const e of data?.examples ?? []) c.set(e.form, (c.get(e.form) ?? 0) + 1)
     const g = new Map<TagGroup, [string, number][]>()
     for (const [f, n] of [...c.entries()].sort((a, b) => b[1] - a[1])) {
-      const code = (tagsOf.get(f) ?? []).find(x => labelsOf(x).length)
-      const grp = code ? groupOf(code) : 'Other'
+      const code = (tagsOf.get(f) ?? []).find(x => labelTag(x))
+      const grp: TagGroup = code ? groupOf(code) : 'Forme'
       g.set(grp, [...(g.get(grp) ?? []), [f, n]])
     }
     return GROUPS.filter(x => g.has(x)).map(x => [x, g.get(x)!] as const)
@@ -75,18 +79,19 @@ export default function Word() {
     <>
       {locState?.fromReview && <button className="link" onClick={() => nav(-1)}>← Back to review</button>}
       <h1>{l.lemma} <Speak text={l.lemma} /></h1>
-      <p className="muted"><span className="tag">{l.pos}</span> {gl.join('; ')}
+      <p className="muted"><span className="tag">{posLabel(l.pos)}</span> {gl.join('; ')}
         {all.length > gl.length || moreGl ? <> <button className="link" onClick={() => setMoreGl(!moreGl)}>{moreGl ? 'less' : `more (${all.length - gl.length})`}</button></> : null}
       </p>
       {others.length > 0 && (
         <p className="muted also" data-testid="didyoumean">Did you mean: {others.map((r, i) => {
           const lab = formLabel(r, hl)
           return (
-            <span key={r.l.id}>{i > 0 && ', '}<Link to={wordUrl(r.l, hl)} state={{ form: hl }}>{r.l.lemma}</Link> ({r.l.pos}{lab ? `, ${lab}` : ''})</span>
+            <span key={r.l.id}>{i > 0 && ', '}<Link to={wordUrl(r.l, hl)} state={{ form: hl }}>{r.l.lemma}</Link> ({posLabel(r.l.pos)}{lab ? `, ${lab}` : ''})</span>
           )
         })}?</p>
       )}
       <CardControls cardRef={{ lemmaKey: l.key }} card={card} />
+      {l.pos === 'verb' && <ConjugationTable forms={data.forms} highlight={hl} />}
       <h2>Examples ({shown.length})</h2>
       {grouped.length > 0 && (
         <div className="filter">
@@ -108,16 +113,12 @@ export default function Word() {
         </div>
       )}
       {shown.length === 0 && <p className="muted">No examples.</p>}
-      {shown.map(e => {
-        const labels = [...new Set(labelsOf((tagsOf.get(e.form) ?? []).join(' | ')))].slice(0, 2)
-        return (
-          <div key={e.id} className="card">
-            <ExLine text={e.it} form={e.form} />
-            <div className="muted">{e.en}</div>
-            {labels.length > 0 && <small className="subtle">{e.form}: {labels.join(' / ')}</small>}
-          </div>
-        )
-      })}
+      {shown.map(e => (
+        <div key={e.id} className="card">
+          <ExLine text={e.it} form={e.form} />
+          <div className="muted">{e.en}</div>
+        </div>
+      ))}
     </>
   )
 }

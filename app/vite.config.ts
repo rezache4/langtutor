@@ -13,8 +13,8 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icons/icon.svg'],
-      // bundle.json (~47MB) lives in IndexedDB after first run; keep it out of the precache
-      workbox: { globPatterns: ['**/*.{js,css,html,svg,png}'], globIgnores: ['data/bundle.json'], navigateFallbackDenylist: [/privacy\.html$/] },
+      // core.json / examples.json (~34MB) live in IndexedDB after first run; keep them out of the precache
+      workbox: { globPatterns: ['**/*.{js,css,html,svg,png}'], globIgnores: ['data/*.json'], navigateFallbackDenylist: [/privacy\.html$/] },
       manifest: {
         name: 'LangTutor',
         short_name: 'LangTutor',

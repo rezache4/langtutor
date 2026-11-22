@@ -6,7 +6,7 @@ import Review from './pages/Review'
 import Stats from './pages/Stats'
 import Settings from './pages/Settings'
 import { useEffect, useRef, useState } from 'react'
-import { loadBundle, type Progress } from './data/loader'
+import { loadBundle, loadExamples, useExamplesStatus, type Progress } from './data/loader'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useSettings } from './lib/settings'
 import { availableCount } from './lib/queue'
@@ -19,9 +19,19 @@ const tabs = [
   { to: '/settings', label: 'Settings', icon: '⚙️' },
 ]
 
+const TIPS = [
+  'Tip: type any Italian form, even a conjugated verb, and you land on its dictionary page.',
+  'Tip: tap "I know it" on a review card to skip words you already know.',
+  'Tip: each review shows a different example sentence, so you learn the word in context.',
+  'Tip: your words and progress sync across devices when you sign in with Google.',
+]
+
 export default function App() {
   const [ready, setReady] = useState(false)
   const [prog, setProg] = useState<Progress | null>(null)
+  const [tip, setTip] = useState(0)
+  useEffect(() => { const t = setInterval(() => setTip(x => x + 1), 5000); return () => clearInterval(t) }, [])
+  const ex = useExamplesStatus()
   useEffect(() => {
     let on = true
     loadBundle(p => { if (on) setProg(p) }).catch(() => { /* offline or no bundle */ }).finally(() => { void syncNow(); if (on) setReady(true) }) // a sync that ran before the dictionary was loaded could not repair old rows
@@ -40,14 +50,28 @@ export default function App() {
     <div className="splash">
       <h1>LangTutor</h1>
       {prog ? <>
-        <p>{prog.phase === 'download' ? 'Downloading dictionary…' : 'Importing…'} {prog.pct}%</p>
-        <div className="bar"><div style={{ width: prog.pct + '%' }} /></div>
+        <p>{prog.phase === 'download' ? 'Downloading the dictionary…' : 'Preparing your words…'} {Math.round(prog.phase === 'download' ? prog.pct / 2 : 50 + prog.pct / 2)}%</p>
+        <div className="bar"><div style={{ width: (prog.phase === 'download' ? prog.pct / 2 : 50 + prog.pct / 2) + '%' }} /></div>
+        <p className="muted">One-time setup. Afterwards the app opens instantly and works offline.</p>
+        <p className="tip">{TIPS[tip % TIPS.length]}</p>
       </> : <p className="muted">Loading…</p>}
     </div>
   )
   return (
     <div className="app">
       <main>
+        {ex.state === 'loading' && (
+          <div className="card ex-banner" data-testid="examples-loading">
+            <small>Loading example sentences… {ex.pct}% <span className="muted">(you can already search and review)</span></small>
+            <div className="bar"><div style={{ width: ex.pct + '%' }} /></div>
+          </div>
+        )}
+        {ex.state === 'error' && (
+          <div className="card ex-banner">
+            <small>Couldn't load the example sentences (offline?). </small>
+            <button className="link" onClick={() => void loadExamples()}>Try again</button>
+          </div>
+        )}
         <Routes>
           <Route path="/" element={<Search />} />
           <Route path="/word/:lemma" element={<Word />} />

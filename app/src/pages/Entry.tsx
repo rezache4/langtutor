@@ -1,3 +1,4 @@
+import { posLabel } from '../lib/tags'
 import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
@@ -6,6 +7,7 @@ import { ExLine, Speak } from '../lib/ui'
 import { isLive, softDeleteEntry } from '../lib/cards'
 import { CardControls } from '../lib/CardControls'
 import { entryExamples } from '../lib/userdata'
+import { addRecentEntry } from '../lib/recent'
 
 /** Page of a user's own word or phrase (imported favorites); mirrors the word page. */
 export default function Entry() {
@@ -19,6 +21,8 @@ export default function Entry() {
     return { e, card: isLive(c) ? c : null }
   }, [id])
   const [examples, setExamples] = useState<Ex[] | null>(null)
+  const found = !!data
+  useEffect(() => { if (found) void addRecentEntry(id) }, [found, id])
   useEffect(() => {
     let on = true
     setExamples(null)
@@ -36,7 +40,7 @@ export default function Entry() {
     <>
       {fromReview && <button className="link" onClick={() => nav(-1)}>← Back to review</button>}
       <h1>{e.text} <Speak text={e.text} /></h1>
-      <p className="muted"><span className="tag">{e.kind}</span> {e.glosses.join('; ')}</p>
+      <p className="muted"><span className="tag">{posLabel(e.kind)}</span> {e.glosses.join('; ')}</p>
       <CardControls cardRef={{ entryId: e.id }} card={card} />
       <h2>Examples{examples ? ` (${examples.length})` : ''}</h2>
       {examples === null && <p className="muted">Searching the example corpus…</p>}

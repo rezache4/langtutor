@@ -5,6 +5,8 @@ import { db, type Lemma, type UserEntry } from '../db/schema'
 import { addCard, isLive, lemmaCardId } from '../lib/cards'
 import { fold, needsChooser, rankForm, suggest, wordUrl, type Ranked, type Suggestion } from '../lib/lookup'
 import { norm } from '../lib/userdata'
+import { posLabel } from '../lib/tags'
+import { clearRecent, recentItems } from '../lib/recent'
 
 export default function Search() {
   const [q, setQ] = useState('')
@@ -15,6 +17,7 @@ export default function Search() {
   const [entries, setEntries] = useState<UserEntry[]>([])
   const nav = useNavigate()
   const count = useLiveQuery(() => db.lemmas.count(), [])
+  const recent = useLiveQuery(recentItems, []) ?? []
   const inDeck = useLiveQuery(async () => new Set((await db.cards.filter(isLive).primaryKeys()) as string[]), [])
 
   const go = (l: Lemma, form: string) => nav(wordUrl(l, form), { state: { form } })
@@ -126,7 +129,7 @@ export default function Search() {
                   <span className="ac-form">{s.form}</span>
                   <span className="ac-arrow muted" aria-hidden="true">→</span>
                   <span className="ac-lemma">{s.l.lemma}</span>
-                  <span className="tag">{s.l.pos}</span>
+                  <span className="tag">{posLabel(s.l.pos)}</span>
                   {s.label && <span className="ac-label muted">{s.label}</span>}
                 </>
               ) : (
@@ -134,18 +137,35 @@ export default function Search() {
                   <span className="ac-form">{s.entry.text}</span>
                   <span className="ac-arrow muted" aria-hidden="true">→</span>
                   <span className="ac-lemma">{s.entry.glosses[0] ?? s.entry.text}</span>
-                  <span className="tag">{s.entry.kind}</span>
+                  <span className="tag">{posLabel(s.entry.kind)}</span>
                 </>
               )}
             </button>
           ))}
         </div>
       )}
+      {!norm(q) && recent.length > 0 && (
+        <div className="recent" data-testid="recent">
+          <div className="recent-head"><small className="muted">Recent</small><button className="link" onClick={() => void clearRecent()}>Clear</button></div>
+          <div className="ac-list">
+            {recent.map(r => (
+              <button key={r.kind === 'lemma' ? `l-${r.l.key}` : `e-${r.entry.id}`} type="button" className="ac-row"
+                onClick={() => (r.kind === 'lemma' ? go(r.l, r.l.lemma) : nav(`/entry/${r.entry.id}`))}>
+                {r.kind === 'lemma' ? (
+                  <><span className="ac-form">{r.l.lemma}</span><span className="tag">{posLabel(r.l.pos)}</span><span className="ac-label muted">{r.l.glosses.slice(0, 2).join('; ')}</span></>
+                ) : (
+                  <><span className="ac-form">{r.entry.text}</span><span className="tag">{posLabel(r.entry.kind)}</span><span className="ac-label muted">{r.entry.glosses.slice(0, 2).join('; ')}</span></>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       {msg && count !== 0 && <p className="muted">{msg}</p>}
       {choices.map(({ l }) => (
         <div key={l.id} className="card choice">
           <button className="choice-main" onClick={() => go(l, norm(q))}>
-            <strong>{l.lemma}</strong> <span className="tag">{l.pos}</span>
+            <strong>{l.lemma}</strong> <span className="tag">{posLabel(l.pos)}</span>
             <div className="muted">{l.glosses.slice(0, 3).join('; ')}</div>
           </button>
           {inDeck?.has(lemmaCardId(l.key))
@@ -157,7 +177,7 @@ export default function Search() {
       {entries.map(e => (
         <div key={e.id} className="card choice">
           <Link className="choice-main" to={`/entry/${e.id}`}>
-            <strong>{e.text}</strong> <span className="tag">{e.kind}</span>
+            <strong>{e.text}</strong> <span className="tag">{posLabel(e.kind)}</span>
             <div className="muted">{e.glosses.slice(0, 3).join('; ')}</div>
           </Link>
         </div>

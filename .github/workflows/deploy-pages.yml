@@ -1,5 +1,5 @@
 # Builds the app and publishes it to GitHub Pages (https://<user>.github.io/langtutor/).
-# The ~34 MB dictionary bundle is not in git: it is a release asset (tag `data-latest`, file `bundle.json`)
+# The dictionary (core.json ~15 MB + examples.json ~19 MB) is not in git: it is a release asset (tag `data-latest`)
 # that this job downloads into app/public/data/ before building. See docs/DEPLOY.md.
 name: deploy-pages
 on:
@@ -32,11 +32,11 @@ jobs:
           cache-dependency-path: app/package-lock.json
       - run: npm ci
       - run: npm test
-      - name: Download the dictionary bundle (release asset)
+      - name: Download the dictionary (release assets)
         working-directory: .
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release download data-latest --pattern bundle.json --dir app/public/data
+        run: gh release download data-latest --pattern core.json --pattern examples.json --dir app/public/data
       - name: Build
         env:
           VITE_BASE: /langtutor/

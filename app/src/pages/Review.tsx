@@ -6,7 +6,7 @@ import { speakAuto } from '../lib/tts'
 import { loadSettings, useSettings, type AppSettings } from '../lib/settings'
 import { buildQueue } from '../lib/queue'
 import { fmtInterval, relDue, nextReviewText } from '../lib/time'
-import { groupForms, labelsOf } from '../lib/tags'
+import { groupForms, posLabel } from '../lib/tags'
 import { CLAMP_LEN, ExLine, Speak } from '../lib/ui'
 import { isActive, isLive, putCard } from '../lib/cards'
 import { entryExamples, lemmaExamples, mergeGlosses, userGlossTexts } from '../lib/userdata'
@@ -270,9 +270,6 @@ export default function Review() {
 
   const { ex, card, title, pos } = cur
   const showSentence = front === 'sentence' && !!ex
-  const formTags = ex && cur.forms.length
-    ? [...new Set(labelsOf(cur.forms.filter(f => f.form === ex.form).map(f => f.tags).join(' | ')))].slice(0, 2)
-    : []
   const header = (
     <div className="rv-head">
       <span className="rv-progress">{Math.min(S.idx + 1, S.queue.length)} / {S.queue.length}</span>
@@ -312,9 +309,8 @@ export default function Review() {
             <>
               {sentenceBlock}
               <hr />
-              <div className="rv-lemma-sm">{title} <Speak text={title} /> {pos && <span className="tag">{pos}</span>}</div>
+              <div className="rv-lemma-sm">{title} <Speak text={title} /> {pos && <span className="tag">{posLabel(pos)}</span>}</div>
               <div className="rv-gloss">{backGlosses.join('; ')}</div>
-              {formTags.length > 0 && <small className="subtle">{ex!.form}: {formTags.join(' / ')}</small>}
               <div className="muted rv-next">{nextReviewText(card)}</div>
               <button className="link rv-details-toggle" aria-expanded={detailsOpen} disabled={S.again} onClick={toggleDetails}>
                 Details {detailsOpen ? '▴' : '▾'}

@@ -38,12 +38,12 @@ signing in on desktop). Items are ordered by priority. "Needs owner" = requires 
 15. Real-device test of the whole flow: phone sign-in (needs the hosted https URL; LAN http test needs the LAN URL in Supabase redirect list).
 
 ## Owner feedback after first real use (2026-11-21), to triage
-A. **First load is slow and boring** (34 MB download + import). Ideas: gzip/brotli the bundle (~6 MB over the wire; Pages may already compress it, verify), split into core (lemmas + forms) and lazy examples, show what is happening and let search work as soon as the core is in, or an "importing, you can already review" state.
-B. **Search box: show recent searches on focus.** Store the last ~10 looked-up words locally (synced setting is optional).
-C. **Italian grammar labels** instead of English ("congiuntivo imperfetto", not "imperfect subjunctive"), and beginner-friendly persons: "(voi)" instead of "2nd pl". Applies to `lib/tags.ts` and everywhere forms are labelled.
-D. **Conjugation table on verb pages** (like Reverso / Wiktionary): mood/tense grid with the pronouns, built from the `forms` tags. Probably a collapsible section per mood.
-E. **Some words show only 1 example** (the bundle keeps up to 25 per lemma, but rare words simply have few Tatoeba sentences). Options: lower the per-lemma pruning, a second lazily loaded sentence file, more sources (backlog 10), or clearly marked AI-generated examples (backlog 14).
-F. **Review card: drop the small grammar line under the translation** (e.g. "masculine plural") when the example's form differs from the lemma.
+A. **First load** (DONE 2026-11-22, to verify on the hosted site): split into `core.json` (usable after ~10 s locally) + `examples.json` loaded in the background with a banner; friendlier splash. Further ideas: measure real download time on a phone connection.
+B. **Recent searches** under the search box (DONE): last 12 words/entries, synced setting `recentWords`, "Clear" link.
+C. **Italian grammar labels** (DONE): "congiuntivo imperfetto (voi)", "presente (io)", parts of speech in Italian (`lib/tags.ts`, `posLabel`).
+D. **Conjugation table** on verb pages (DONE): collapsible "Coniugazione", simple tenses only (compound tenses are not in the data; could be generated with avere/essere if the auxiliary were known).
+E. **Some words show only 1 example.** Owner prefers REAL sentences (no AI-generated ones). Plan: first check how many lemmas have <3 examples and why (pruning vs corpus), then add sources: all-Italian Tatoeba sentences matched by form (backlog 10), Wiktionary usage examples, and possibly other open corpora (license must be CC BY/CC BY-SA/public domain).
+F. **Review card: small grammar line under the translation** (DONE: removed there and on word pages).
 G. **Badge showed 1 but Review was empty** (FIXED 2026-11-21): a card pushed by the pre-migration build reached the hosted site in the old shape. Rows in the old shape are now repaired after each pull and ignored by the queue.
 
 ## Done (reference)
